@@ -1,12 +1,22 @@
 ---
-phase: "Ролик: понятная история с аферой — реализовано и опубликовано"
-updated: 2026-10-08
-next: "Ревью draft PR #9 «Ролик: понятная история с аферой» и плейтест владельца"
-blockers: "технических нет; owner-only просмотр и плейтест вне one-pass"
+phase: "Адрес сайта imdmtrv.github.io — ролики обновлены, PR #10"
+updated: 2026-10-13
+next: "Слияние PR #10, деплой на Pages и проверка живого сайта; загрузка ассетов trailer-chat"
+blockers: "из облачной сессии: нет доступа к imdmtrv.github.io и загрузки файлов в релиз"
 ---
 # STATUS — Архипелаг
 
 ## Сейчас
+
+Репозиторий перенесён в `imdmtrv/archipelago`; сайт — `https://imdmtrv.github.io/archipelago/`.
+По [брифу адреса](docs/specs/site-address.md) адрес заменён в `deploy.yml`, `apps/web/.env`, README
+и финальной карточке ролика; ссылки STATUS ведут на `imdmtrv`. Сборка для Pages даёт полные `og:url`/`og:image`
+с новым адресом, `check-publish` проходит. Во всех четырёх финалах и двух RU draft перерисован только кадр `end`,
+остальные кадры и звук бит-в-бит прежние. Ассеты для `trailer-chat` готовы, но из облачной сессии не загружаются
+(прокси GitHub API пропускает только JSON). Протокол — [приёмка адреса](docs/qa/site-address.md);
+[PR #10](https://github.com/imdmtrv/archipelago/pull/10).
+
+### Историческая запись по объединённому PR #9
 
 После слияния PR #8 (`main` `f67b4e8`) задача продолжена новой веткой
 `chat/trailer-scam` по [брифу истории с аферой](docs/specs/trailer-scam-story.md).
@@ -24,12 +34,12 @@ blockers: "технических нет; owner-only просмотр и пле�
 `−14,4…−14,6 LUFS`, true peak `−2,2…−2,1 dBTP`. 109-кадровый
 двойной детерминированный render `asset`: PSNR minimum `61,08 dB`, average `68,820352 dB`.
 Новый `sourceHash`: `bcc44035f29c00d127174f1e4076b3b29ad3dda422ff6558f2911ab57088265d`.
-Все 14 ассетов prerelease [`trailer-chat`](https://github.com/dmtrml/archipelago/releases/tag/trailer-chat)
+Все 14 ассетов prerelease [`trailer-chat`](https://github.com/imdmtrv/archipelago/releases/tag/trailer-chat)
 обновлены и совпадают с локальными по SHA-256 **14/14**. Два JPEG-фрагмента трёхкадровой
 истории сохранены в `docs/qa/trailer/`. Полный протокол —
 [приёмка истории с аферой](docs/qa/trailer-scam-story.md).
-Открыт [черновой PR #9 «Ролик: понятная история с аферой»](https://github.com/dmtrml/archipelago/pull/9)
-из `chat/trailer-scam` в `main`; это отдельная от слитого PR #8 работа.
+[PR #9 «Ролик: понятная история с аферой»](https://github.com/imdmtrv/archipelago/pull/9)
+из `chat/trailer-scam` слит в `main` (`4c20e24`).
 
 ### Историческая запись по объединённому PR #8
 
@@ -75,25 +85,24 @@ blockers: "технических нет; owner-only просмотр и пле�
 и свободы; остальные 37 пунктов синтезированы.
 Выбор сохраняется для игры; оба варианта можно сравнить без изменения настроек.
 Музыка и непрерывная природа переключаются плавно во время воспроизведения.
-Оба этапа — [PR #6](https://github.com/dmtrml/archipelago/pull/6) и
-[PR #7](https://github.com/dmtrml/archipelago/pull/7) — слиты в `main`.
+Оба этапа — [PR #6](https://github.com/imdmtrv/archipelago/pull/6) и
+[PR #7](https://github.com/imdmtrv/archipelago/pull/7) — слиты в `main`.
 Материалы: [приёмка файлов](docs/qa/sound-files.md), [авторы и лицензии](CREDITS.md).
 
 ## Следующие шаги
 
-[План запуска](docs/specs/launch.md) — четыре этапа реализованы в one-pass ветке:
-[публикация](docs/specs/launch-1-publish.md) → [первые минуты и «Поделиться»](docs/specs/launch-2-first-minutes.md) →
-[английская версия](docs/specs/launch-3-english.md) → [рекламный ролик](docs/specs/launch-4-trailer.md).
-После ревью выполнены исправления 1–8. Пункт 9 остаётся текущим следующим шагом: закончить рендер,
-перепроверить финальные MP4/draft/QA и только затем обновить prerelease `trailer-chat` и описание draft PR #8.
-Owner-only плейтест и реальные внешние настройки остаются ручными fallback-действиями после этого.
+1. Слить [PR #10](https://github.com/imdmtrv/archipelago/pull/10): push в `main` запускает `Deploy`.
+2. Проверить живой сайт `https://imdmtrv.github.io/archipelago/` и `/en/`: страницы, превью ссылок, звуки, шрифты.
+3. Загрузить 13 изменённых ассетов в `trailer-chat` и сверить `digest` с [приёмкой](docs/qa/site-address.md).
+4. Владелец: GoatCounter и `FEEDBACK_URL`, плейтест по [протоколу](docs/specs/launch.md#протокол-плейтеста-для-владельца).
 
 ## Блокеры и открытые вопросы
 
-- Пункт 9 ещё не завершён: рендер и публикация исправленных trailer assets выполняются параллельно.
+- Облачная сессия Claude не открывает `imdmtrv.github.io` (сетевая политика окружения) и не загружает файлы в релизы.
 
 ## Последнее сделанное
 
+- 2026-10-13 — адрес сайта заменён на `imdmtrv.github.io`; в роликах перерисована только финальная карточка, остальные кадры и звук бит-в-бит прежние.
 - 2026-10-07 — исправления 1–8 по проверке Claude выполнены отдельными коммитами; corrected i18n QA прошёл 3/3 с одинаковым нормализованным SHA-256, coach QA — 3/3 на обоих viewport.
 - 2026-10-05 — завершён этап 4: детерминированный режиссёрский режим, четыре финальных ролика и полная trailer QA.
 - 2026-10-05 — добавлена полная английская версия, data-only world v4 и миграция старых сохранений; RU сохранён как эталонный словарь.

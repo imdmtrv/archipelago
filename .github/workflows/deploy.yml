@@ -28,7 +28,7 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: /archipelago/
-          VITE_SITE_URL: https://dmtrml.github.io/archipelago/
+          VITE_SITE_URL: https://imdmtrv.github.io/archipelago/
           VITE_GOATCOUNTER_URL: ${{ vars.GOATCOUNTER_URL }}
           VITE_FEEDBACK_URL: ${{ vars.FEEDBACK_URL }}
       - uses: actions/upload-pages-artifact@v5

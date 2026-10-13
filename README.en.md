@@ -1,6 +1,6 @@
 # Archipelago
 
-**Play:** https://dmtrml.github.io/archipelago/en/
+**Play:** https://imdmtrv.github.io/archipelago/en/
 
 Archipelago is a cozy browser game about money and financial freedom. Build passive income on your own island, avoid scams, and see how your path compares with your neighbors.
 
