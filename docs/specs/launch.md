@@ -88,7 +88,7 @@
 
 | Вопрос | Решение |
 |---|---|
-| Хостинг | GitHub Pages через GitHub Actions: `https://dmtrml.github.io/archipelago/`. Свой домен — позже |
+| Хостинг | GitHub Pages через GitHub Actions: `https://imdmtrv.github.io/archipelago/` (до переноса репозитория — `dmtrml.github.io`). Свой домен — позже |
 | Аудитория и тон | Дети и взрослые, как в спецификации звука. К игроку — на «вы». Без азарта и давления |
 | Название по-английски | **Archipelago**, подзаголовок «A cozy game about money and freedom» |
 | Подзаголовок по-русски | «Уютная игра про деньги и свободу» |
