@@ -512,7 +512,7 @@ function EndCard({ lang, format, durationBeats }: { lang: TrailerLang; format: T
         <div className="director-end-cta">
           {lang === 'ru' ? 'Играйте бесплатно в браузере' : 'Play free in your browser'}
         </div>
-        <div className="director-end-url">dmtrml.github.io/archipelago{lang === 'en' ? '/en' : ''}</div>
+        <div className="director-end-url">imdmtrv.github.io/archipelago{lang === 'en' ? '/en' : ''}</div>
         <div className="director-end-bio">{lang === 'ru' ? 'Ссылка — в профиле' : 'Link in bio'}</div>
       </div>
     </>

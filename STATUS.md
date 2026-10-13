@@ -24,11 +24,11 @@ blockers: "технических нет; owner-only просмотр и пле�
 `−14,4…−14,6 LUFS`, true peak `−2,2…−2,1 dBTP`. 109-кадровый
 двойной детерминированный render `asset`: PSNR minimum `61,08 dB`, average `68,820352 dB`.
 Новый `sourceHash`: `bcc44035f29c00d127174f1e4076b3b29ad3dda422ff6558f2911ab57088265d`.
-Все 14 ассетов prerelease [`trailer-chat`](https://github.com/dmtrml/archipelago/releases/tag/trailer-chat)
+Все 14 ассетов prerelease [`trailer-chat`](https://github.com/imdmtrv/archipelago/releases/tag/trailer-chat)
 обновлены и совпадают с локальными по SHA-256 **14/14**. Два JPEG-фрагмента трёхкадровой
 истории сохранены в `docs/qa/trailer/`. Полный протокол —
 [приёмка истории с аферой](docs/qa/trailer-scam-story.md).
-Открыт [черновой PR #9 «Ролик: понятная история с аферой»](https://github.com/dmtrml/archipelago/pull/9)
+Открыт [черновой PR #9 «Ролик: понятная история с аферой»](https://github.com/imdmtrv/archipelago/pull/9)
 из `chat/trailer-scam` в `main`; это отдельная от слитого PR #8 работа.
 
 ### Историческая запись по объединённому PR #8
@@ -75,8 +75,8 @@ blockers: "технических нет; owner-only просмотр и пле�
 и свободы; остальные 37 пунктов синтезированы.
 Выбор сохраняется для игры; оба варианта можно сравнить без изменения настроек.
 Музыка и непрерывная природа переключаются плавно во время воспроизведения.
-Оба этапа — [PR #6](https://github.com/dmtrml/archipelago/pull/6) и
-[PR #7](https://github.com/dmtrml/archipelago/pull/7) — слиты в `main`.
+Оба этапа — [PR #6](https://github.com/imdmtrv/archipelago/pull/6) и
+[PR #7](https://github.com/imdmtrv/archipelago/pull/7) — слиты в `main`.
 Материалы: [приёмка файлов](docs/qa/sound-files.md), [авторы и лицензии](CREDITS.md).
 
 ## Следующие шаги
