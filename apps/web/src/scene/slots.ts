@@ -3,7 +3,7 @@
 import type { SlotType } from '@arch/engine';
 import type { DreamProgress } from './contract';
 import {
-  BEACH_Y, FACE_CAMERA, GRASS_Y, PIER_A, PIER_START, PLAZA_ANNEX_POS, PLAZA_POS,
+  BEACH_Y, FACE_CAMERA, GRASS_Y, PIER_A, PIER_LANDING, PIER_START, PLAZA_ANNEX_POS, PLAZA_POS,
   fromScreen, onBeach, type Reserve,
 } from './layout';
 
@@ -45,8 +45,8 @@ export const SLOTS: Record<Exclude<SlotType, 'finance'>, SlotPlace[]> = {
   // два места на широком песке (справа и слева) и одно на узком у пирса — там фасадом строго к морю
   beach: [beachPlace(0.1, 0.45), beachPlace(2.25, 0.42), beachPlace(1.62, 0.55, 0.12)],
   plaza: [
-    { x: PLAZA_POS.x, y: GRASS_Y + 0.14, z: PLAZA_POS.z, rotY: FACE_CAMERA },
-    { x: PLAZA_ANNEX_POS.x, y: GRASS_Y + 0.1, z: PLAZA_ANNEX_POS.z, rotY: FACE_CAMERA },
+    { x: PLAZA_POS.x, y: GRASS_Y + 0.14, z: PLAZA_POS.z, rotY: Math.atan2(PIER_LANDING.x - PLAZA_POS.x, PIER_LANDING.z - PLAZA_POS.z) },
+    { x: PLAZA_ANNEX_POS.x, y: GRASS_Y + 0.1, z: PLAZA_ANNEX_POS.z, rotY: Math.atan2(PIER_LANDING.x - PLAZA_ANNEX_POS.x, PIER_LANDING.z - PLAZA_ANNEX_POS.z) },
   ],
   sea: [seaPlace(0.42, 20.5, 0.75), seaPlace(1.72, 20, 2.1)],
 };

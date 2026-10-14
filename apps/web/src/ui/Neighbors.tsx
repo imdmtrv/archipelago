@@ -2,7 +2,7 @@
 // Карточка — урок сравнения: те же правила, разные привычки, разный результат.
 import { useEffect, useRef, useState } from 'react';
 import {
-  assetViews, financeView, getPlayer, leaderboard,
+  assetViews, financeView, getPlayer, isScamVisible, leaderboard,
   type AssetView, type PlayerState, type WorldState,
 } from '@arch/engine';
 import { HUMAN, useGame, type FreedomHistory } from '../store';
@@ -55,7 +55,7 @@ function insightFor(world: WorldState, p: PlayerState, views: AssetView[]): Insi
   const statusUpkeep = status.reduce((s, v) => s + v.upkeep, 0);
   const emergency = p.loans.some((l) => l.emergency);
   // Афера выдаёт себя только тем, кто учился, — как на доске сделок
-  const scam = me.knowledge >= 1 && views.some((v) => v.def.kind === 'scam');
+  const scam = views.some((v) => isScamVisible(v.def.id, me.knowledge));
 
   if (emergency) {
     return { tone: 'bad', text: t.ui.neighbors.insightEmergency(shown.name, fmt(fin.expenses.interest), p.id === 'bot-mia') };

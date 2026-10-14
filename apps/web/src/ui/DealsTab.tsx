@@ -1,6 +1,6 @@
 import { financeView, getPlayer, offerViews, type OfferView } from '@arch/engine';
 import { HUMAN, useGame } from '../store';
-import { assetCopy, marketLine, sectorName, useI18n } from '../i18n';
+import { assetCopy, marketLine, scamWarning, sectorName, useI18n } from '../i18n';
 import { FreedomLine } from './common';
 
 function OfferCard({ v, cash, freedom }: { v: OfferView; cash: number; freedom: number }) {
@@ -41,7 +41,7 @@ function OfferCard({ v, cash, freedom }: { v: OfferView; cash: number; freedom: 
           : <>{t.ui.deals.total} {signed(v.net)}{t.ui.perWeek} — {t.ui.deals.onlyExpenses}{v.def.joy > 0 ? `, ${t.ui.deals.joy(v.def.joy)}` : ''}</>}
       </div>
       <FreedomLine before={freedom} after={v.freedomAfter} />
-      {v.warning && <div className="warning"><span aria-hidden>⚠</span> {t.ui.deals.scam}</div>}
+      {v.warning && <div className="warning"><span aria-hidden>⚠</span> {scamWarning(v.def.id)}</div>}
       <button
         className="btn primary"
         disabled={!!reason}

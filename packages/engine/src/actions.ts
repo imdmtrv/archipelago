@@ -36,7 +36,7 @@ const buyOffer: Handler<Extract<PlayerAction, { type: 'buyOffer' }>> = (world, p
     slotIndex,
   };
   if (def.collapseWeeks) {
-    // «Живёт» 2–5 недель, считая неделю покупки; в неделю краха уже не платит.
+    // Срок жизни включает неделю покупки; в неделю краха афера уже не платит.
     const rng = new Rng(world.rng);
     asset.collapseWeek = world.week + rng.int(def.collapseWeeks[0], def.collapseWeeks[1]) - 1;
     world.rng = rng.state;

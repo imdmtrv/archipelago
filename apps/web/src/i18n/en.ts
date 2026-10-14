@@ -121,6 +121,18 @@ export const en: Dict = {
       description: 'A smiling stranger promises huge weekly returns and asks you not to ask too many questions.',
       upgrades: [],
     },
+    oysterBeds: {
+      title: 'Oyster beds',
+      accusative: 'oyster beds',
+      description: 'The manager will set the beds by your shore and guarantees income every week. He needs the money now and will show the contract later.',
+      upgrades: [],
+    },
+    tideFund: {
+      title: 'Tide mutual fund',
+      accusative: 'the Tide mutual fund',
+      description: 'Islanders pay into a shared fund and get paid every week. The more new members you bring in, the higher your share.',
+      upgrades: [],
+    },
     fountain: {
       title: 'Marble fountain',
       accusative: 'a marble fountain',
@@ -186,6 +198,8 @@ export const en: Dict = {
     repaid: (name, _female, amount) => `${name} repaid debt: ${amount}`,
     emergency: (name, _female, amount) => `${name} borrowed ${amount} from a loan shark`,
     scam: (name) => `${name}: the “pearl farm” vanished with the money — it was a pyramid scheme`,
+    scamOysterBeds: (name) => `${name}: the oyster beds turned out to be empty — it was a pyramid scheme`,
+    scamTideFund: (name) => `${name}: the Tide fund ran dry — it was a pyramid scheme`,
     freedomBot: (name, _female, week) => `${name}: financial freedom in week ${week}!`,
     freedomHuman: (name, week) => `${name}: financial freedom in week ${week}!`,
     dreamDone: (name) => `${name}: the schooner is ready and setting off around the world!`,
@@ -281,6 +295,14 @@ export const en: Dict = {
     scamCollapse: {
       title: 'The farm vanished',
       text: 'The “pearl farm” vanished with the money. It was a pyramid scheme: older investors were paid with new money until the new money stopped.',
+    },
+    scamCollapseOysterBeds: {
+      title: 'The beds are empty',
+      text: 'There was not a single oyster in the beds, and the manager vanished. Payments came from new investors’ money. Guaranteed income and “the contract later” are clear signs of a scam.',
+    },
+    scamCollapseTideFund: {
+      title: 'The fund ran dry',
+      text: 'New members stopped joining, and payments ended: the fund paid only from newcomers’ contributions. If your income depends on how many people you bring in, it is a pyramid scheme.',
     },
     emergencyLoan: {
       title: 'Loan shark',
@@ -402,6 +424,8 @@ export const en: Dict = {
       empty: 'The board is empty — new deals arrive next week.',
       hint: 'Your neighbors watch this board too: deals you skip may be taken by them.',
       scam: 'The return looks too good — this may be a pyramid scheme',
+      scamOysterBeds: 'Guaranteed income, but the contract comes later: this looks like a scam',
+      scamTideFund: 'Payments come from newcomers’ contributions — this looks like a pyramid scheme',
     },
     island: {
       empty: 'For now, your island has only your home. Assets earn money every week — even while you rest.',

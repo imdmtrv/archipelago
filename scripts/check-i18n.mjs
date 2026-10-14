@@ -436,18 +436,21 @@ try {
   const newsMismatches = Object.keys(baseline.news)
     .filter((key) => JSON.stringify(current.news[key]) !== JSON.stringify(baseline.news[key]));
 
-  // Root precedence: browser RU -> RU; non-RU -> EN; saved choice beats browser.
+  // Root precedence: saved choice beats default; root defaults to RU (browser locale ignored).
   {
     const ruBrowser = await newPage(url, { lang: null, locale: 'ru-RU' });
     assert.equal(await ruBrowser.page.evaluate(() => document.documentElement.lang), 'ru');
     await ruBrowser.context.close();
     const deBrowser = await newPage(url, { lang: null, locale: 'de-DE' });
-    assert.equal(await deBrowser.page.evaluate(() => document.documentElement.lang), 'en');
-    assert(!CYRILLIC.test(await text(deBrowser.page)), 'de-DE root should render EN');
+    assert.equal(await deBrowser.page.evaluate(() => document.documentElement.lang), 'ru');
+    assert(CYRILLIC.test(await text(deBrowser.page)), 'de-DE root without saved choice should render RU');
     await deBrowser.context.close();
     const savedRu = await newPage(url, { lang: 'ru', locale: 'de-DE' });
     assert.equal(await savedRu.page.evaluate(() => document.documentElement.lang), 'ru');
     await savedRu.context.close();
+    const savedEn = await newPage(url, { lang: 'en', locale: 'de-DE' });
+    assert.equal(await savedEn.page.evaluate(() => document.documentElement.lang), 'en');
+    await savedEn.context.close();
   }
 
   // /en/ is always EN even if storage asks for RU.

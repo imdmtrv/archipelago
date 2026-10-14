@@ -119,8 +119,8 @@ export function rollWorldEvent(world: WorldState, rng: Rng, reports: Record<stri
 
 // ───────────── Аферы, долги, свобода ─────────────
 
-export function scamCollapseEvent(assetUid: string): GameEvent {
-  return event('scamCollapse', 'bad', {}, { affectedAssetUids: [assetUid] });
+export function scamCollapseEvent(assetUid: string, defId: string): GameEvent {
+  return event('scamCollapse', 'bad', { defId }, { affectedAssetUids: [assetUid] });
 }
 export function emergencyLoanEvent(amount: number): GameEvent {
   return event('emergencyLoan', 'bad', { amount, rate: Math.round(R.EMERGENCY_RATE * 100) });

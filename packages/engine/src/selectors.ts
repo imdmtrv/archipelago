@@ -1,5 +1,6 @@
 // Производные данные для UI. Только чтение мира.
 import { upgradeError } from './actions';
+import { isScamVisible } from './content';
 import {
   assetsValue, currentIncome, dreamWorkPerWeek, freedomLevel, getDef, getDream, isSlotFull,
   maxLevel, nextUpgrade, offerIncome, passiveIncome, repairCost, saleValue, totalDebt, upgradedAsset,
@@ -125,7 +126,7 @@ export function offerViews(world: WorldState, playerId: string): OfferView[] {
       slotFull: isSlotFull(player, def.slot),
       freedomAfter: freedomAfterBuying(world, player, offer),
     };
-    if (def.kind === 'scam' && player.knowledge >= R.SCAM_SIGHT_KNOWLEDGE) view.warning = 'scam';
+    if (isScamVisible(def.id, player.knowledge)) view.warning = 'scam';
     return view;
   });
 }

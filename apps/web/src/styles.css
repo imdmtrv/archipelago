@@ -563,3 +563,35 @@ button, input { font: inherit; color: inherit; }
 .link-btn:hover { text-decoration: underline; }
 .welcome { position: relative; }
 .welcome .language-switch { position: absolute; top: 14px; right: 14px; z-index: 2; }
+
+/* ───────── Переключатель языка в верхней панели ───────── */
+.badge .language-switch {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+.badge .language-switch button {
+  min-width: 28px;
+  height: 34px;
+  padding: 0 7px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--well);
+  color: var(--ink-soft);
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+}
+.badge .language-switch button:hover {
+  background: rgba(31, 42, 68, 0.1);
+}
+.badge .language-switch button.active {
+  background: rgba(245, 184, 61, 0.32);
+  border-color: var(--gold-deep);
+  color: var(--ink);
+}
+

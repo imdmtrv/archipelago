@@ -43,7 +43,8 @@ export const BOARD_SIZE = 4;
 export const OFFER_LIFETIME = 3;            // недель на доске
 export const OFFER_PRICE_SPREAD = 0.15;     // цена ±15%
 export const OFFER_INCOME_SPREAD = 0.2;     // доход ±20%
-export const DEAL_KIND_WEIGHTS = { asset: 0.6, status: 0.28, scam: 0.12 } as const;
+export const DEAL_KIND_WEIGHTS = { asset: 0.62, status: 0.28, scam: 0.10 } as const;
+export const MAX_SCAMS_ON_BOARD = 1;
 
 // ───────────── Продажа ─────────────
 /** Насколько цена продажи рыбных/туристических активов следует за индексом сектора. */
