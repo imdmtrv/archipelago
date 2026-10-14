@@ -1,7 +1,7 @@
 // Развилки, цели и слухи — чистые производные данные для UI.
 import { buyerAsset } from './choices';
 import { GOALS } from './content';
-import { currentIncome, passiveIncome, saleValue, weeklyExpenses } from './economy';
+import { currentIncome, freeSlotIndex, getDef, passiveIncome, saleValue, weeklyExpenses } from './economy';
 import { goalProgress } from './goals';
 import * as R from './rules';
 import type { ChoiceView, GoalsView, PlayerState, RumorView, WorldState } from './types';
@@ -22,10 +22,21 @@ export function choiceView(world: WorldState, playerId: string): ChoiceView | nu
       returnAmount: Math.round(amount * (1 + R.NEIGHBOR_LOAN_BONUS)), canAccept,
       ...(!canAccept ? { reason: { code: 'notEnoughCash' as const, missing: amount - player.cash } } : {}) };
   }
-  if (choice.kind === 'promotion') {
-    const salaryIncrease = Number(choice.params.salary), livingIncrease = Number(choice.params.living);
-    return { kind: choice.kind, uid: choice.uid, salaryIncrease, livingIncrease, netChange: salaryIncrease - livingIncrease,
-      freedomBefore: ratio(player), freedomAfter: ratio({ ...player, living: player.living + livingIncrease }) };
+  if (choice.kind === 'fireSale') {
+    const neighbor = world.players.find((p) => p.id === choice.params.neighborId);
+    const asset = neighbor && buyerAsset(neighbor, choice.params.assetUid);
+    if (!asset) return null;
+    const slot = getDef(asset.defId).slot;
+    const price = Number(choice.params.price);
+    const weeklyIncome = currentIncome(asset, world.market, player.knowledge);
+    const net = weeklyIncome - asset.upkeep;
+    const reason = freeSlotIndex(player, slot) === null ? { code: 'slotFull' as const, slot }
+      : player.cash < price ? { code: 'notEnoughCash' as const, missing: price - player.cash } : null;
+    return { kind: choice.kind, uid: choice.uid, neighborId: neighbor.id, assetUid: asset.uid,
+      defId: asset.defId, level: asset.level, price, usualPrice: asset.price, weeklyIncome,
+      paybackWeeks: net > 0 ? Math.ceil(price / net) : null,
+      freedomBefore: ratio(player), freedomAfter: ratio({ ...player, owned: [...player.owned, { ...asset, price }] }),
+      canAccept: reason === null, ...(reason ? { reason } : {}) };
   }
   const asset = buyerAsset(player, choice.params.assetUid);
   if (!asset) return null;
@@ -48,7 +59,7 @@ export function rumorViews(world: WorldState, playerId: string): RumorView[] {
   const player = world.players.find((p) => p.id === playerId);
   if (!player) return [];
   return [...world.upcoming].sort((a, b) => a.week - b.week).map((e) => ({
-    kind: e.kind, fromWeek: e.windowStart, toWeek: e.windowStart + 1,
+    kind: e.kind, source: e.source, fromWeek: e.windowStart, toWeek: e.windowStart + 1,
     exactWeek: player.knowledge >= R.RUMOR_EXACT_KNOWLEDGE ? e.week : null,
   }));
 }

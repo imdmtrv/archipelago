@@ -26,7 +26,7 @@ export const INCOME_BONUS_KNOWLEDGE = 3;
 export const INCOME_BONUS = 0.1;            // +10% к доходу активов
 
 // ───────────── Кредиты ─────────────
-export const LOAN_RATE = 0.015;             // обычный кредит, в неделю
+export const LOAN_RATE = 0.017;             // обычный кредит, в неделю
 export const EMERGENCY_RATE = 0.04;         // ростовщик, в неделю
 export const LOAN_LIMIT_SALARY_WEEKS = 3;   // лимит = 3 × зарплата + …
 export const LOAN_LIMIT_ASSET_SHARE = 0.3;  // … + 30% стоимости продажи имущества − долги
@@ -93,21 +93,22 @@ export const SHOCK_DECAY = 0.7;             // всплески затухают
 // ───────────── Слухи ─────────────
 export const RUMOR_LEAD: [number, number] = [2, 4]; // общее событие планируется на 2–4 недели вперёд
 export const RUMOR_EXACT_KNOWLEDGE = 2;     // с этого уровня знаний слух называет точную неделю
+export const RUMOR_RELIABLE_SHARE = 0.75;   // о настоящем событии в 3 случаях из 4 говорит надёжный источник
+export const FALSE_RUMOR_CHANCE = 0.06;     // шанс в неделю, что пойдёт ложный слух…
+export const FALSE_RUMOR_GOSSIP_SHARE = 0.8; // …и обычно это рыночная болтовня (итого: надёжный ≈ 9/10, болтовня < 1/2)
 
 // ───────────── Развилки (только у человека) ─────────────
 export const CHOICE_CHANCE = 0.3;           // шанс развилки в конце недели…
 export const CHOICE_COOLDOWN = 3;           // …не раньше чем через 3 недели после прошлой
-export const CHOICE_WEIGHTS = { neighborLoan: 0.4, promotion: 0.25, buyer: 0.35 } as const;
+export const CHOICE_WEIGHTS = { neighborLoan: 0.4, fireSale: 0.3, buyer: 0.3 } as const;
 export const NEIGHBOR_LOAN_ASK: [number, number] = [200, 350]; // сосед просит, округляется до 10
 export const NEIGHBOR_LOAN_BONUS = 0.1;     // возвращает с благодарностью +10%
 export const NEIGHBOR_LOAN_DUE: [number, number] = [4, 8];     // через столько недель пробует вернуть
 export const NEIGHBOR_LOAN_RETRY = 2;       // не смог — пробует снова через 2 недели…
 export const NEIGHBOR_LOAN_TRIES = 3;       // …всего 3 попытки, потом долг пропадает
 export const NEIGHBOR_LOAN_JOY = 4;         // помочь соседу приятно
-export const PROMOTION_SALARY = 40;         // повышение с переездом: +40 к зарплате…
-export const PROMOTION_LIVING = 35;         // …и +35 к расходам — финиш свободы отодвигается
-export const PROMOTION_JOY = -3;            // переезд утомляет
-export const PROMOTION_MAX = 2;             // не больше двух за партию
+export const FIRE_SALE_DISCOUNT: [number, number] = [0.6, 0.75]; // сосед в беде отдаёт актив за 60–75% своей цены
+export const FIRE_SALE_TROUBLE_CASH = 150;  // «в беде» — заём у ростовщика или наличных меньше этого
 export const BUYER_PREMIUM: [number, number] = [1.2, 1.45]; // покупатель предлагает 120–145% уплаченной цены
 
 // ───────────── Цели ─────────────

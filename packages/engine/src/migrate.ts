@@ -1,4 +1,4 @@
-// Миграция сохранений: старые версии последовательно приводятся к текущей v5.
+// Миграция сохранений: старые версии последовательно приводятся к текущей v6.
 // Вход — «сырой» JSON из localStorage, поэтому всё проверяем руками; непонятное — null.
 import { DREAMS, GOALS } from './content';
 import { newGoalsState } from './goals';
@@ -116,7 +116,7 @@ function isWorldBase(raw: unknown): raw is Obj & { players: unknown[] } {
 }
 
 /**
- * Принимает сохранённый мир версии 1–5 и возвращает мир версии 5 (копию, вход не меняется).
+ * Принимает сохранённый мир версии 1–6 и возвращает мир версии 6 (копию, вход не меняется).
  * Версия 1 сначала становится версией 2: игрок-человек (первый, не бот) получает чистую мечту,
  * все остаются на работе, уже достигнутая свобода считается первым уровнем.
  * Версия 2 становится версией 3: всё купленное — первого уровня. Всё непонятное — null.
@@ -124,7 +124,7 @@ function isWorldBase(raw: unknown): raw is Obj & { players: unknown[] } {
 export function migrateWorld(raw: unknown): WorldState | null {
   if (!isWorldBase(raw)) return null;
   const version = raw.version;
-  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5) return null;
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6) return null;
 
   let world: Obj;
   try {
@@ -134,8 +134,18 @@ export function migrateWorld(raw: unknown): WorldState | null {
   }
   const players = world.players as unknown[];
 
-  if (version === 5) {
-    if (!players.every(isPlayerV5) || !Array.isArray(world.upcoming) || !world.upcoming.every(isUpcoming)) return null;
+  if (version >= 5) {
+    if (!players.every((p) => isPlayerEngagement(p, version)) || !Array.isArray(world.upcoming)
+      || !world.upcoming.every((e) => isUpcoming(e) && (version === 5 || isObj(e)
+        && typeof e.real === 'boolean' && ['reliable', 'gossip'].includes(String(e.source))))) return null;
+    if (version === 5) {
+      for (const e of world.upcoming as Obj[]) { e.real = true; e.source = 'reliable'; }
+      for (const p of players as Obj[]) {
+        if (isObj(p.choice) && p.choice.kind === 'promotion') p.choice = null;
+        delete p.promotions;
+      }
+      world.version = 6;
+    }
     return world as unknown as WorldState;
   }
 
@@ -149,22 +159,22 @@ export function migrateWorld(raw: unknown): WorldState | null {
     p.insuranceFrom = p.insured ? world.week : null;
     p.choice = null;
     p.lastChoiceWeek = 0;
-    p.promotions = 0;
+    delete p.promotions;
     p.lent = [];
     p.goals = p.isBot ? null : newGoalsState();
   }
   world.upcoming = [];
-  world.version = 5;
+  world.version = 6;
   return world as unknown as WorldState;
 }
 
-function isPlayerV5(value: unknown): boolean {
+function isPlayerEngagement(value: unknown, version: number): boolean {
   if (!isPlayerV3(value) || !isObj(value)) return false;
   const g = value.goals;
   return (value.insuranceFrom === null || isNum(value.insuranceFrom))
-    && isNum(value.lastChoiceWeek) && isNum(value.promotions)
+    && isNum(value.lastChoiceWeek) && (version !== 5 || isNum(value.promotions))
     && (value.choice === null || (isObj(value.choice) && typeof value.choice.uid === 'string'
-      && ['neighborLoan', 'promotion', 'buyer'].includes(String(value.choice.kind))
+      && ['neighborLoan', version === 5 ? 'promotion' : 'fireSale', 'buyer'].includes(String(value.choice.kind))
       && isNum(value.choice.week) && isObj(value.choice.params)))
     && Array.isArray(value.lent) && value.lent.every((l) => isObj(l) && typeof l.uid === 'string'
       && typeof l.neighborId === 'string' && isNum(l.amount) && isNum(l.dueWeek) && isNum(l.tries))

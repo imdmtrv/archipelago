@@ -73,22 +73,27 @@ export interface DreamState {
 /** Общие события недели. Они планируются заранее, и о них идут слухи. */
 export type WorldEventKind = 'storm' | 'fishShoal' | 'touristBoom' | 'crisis';
 
-/** Запланированное общее событие. Скрытая правда: UI показывает игроку только слух (`rumorViews`). */
+/** Откуда слух: надёжный источник (старые рыбаки, банк) сбывается почти всегда, рыночная болтовня — редко. */
+export type RumorSource = 'reliable' | 'gossip';
+
+/** Запланированное общее событие или ложный слух. Скрытая правда: UI показывает игроку только слух (`rumorViews`). */
 export interface UpcomingEvent {
   kind: WorldEventKind;
+  real: boolean;             // false — слух не сбудется (скрытая правда, UI её не показывает)
+  source: RumorSource;
   week: number;              // в конце какой недели событие случится
   windowStart: number;       // слух называет недели windowStart и windowStart + 1; `week` — одна из них
   announcedWeek: number;     // в конце какой недели пошёл слух
 }
 
-export type ChoiceKind = 'neighborLoan' | 'promotion' | 'buyer';
+export type ChoiceKind = 'neighborLoan' | 'fireSale' | 'buyer';
 
 /** Развилка: выпадает в конце недели, игрок решает её в течение следующей недели `week`. */
 export interface PendingChoice {
   uid: string;
   kind: ChoiceKind;
   week: number;
-  /** neighborLoan: neighborId, amount; promotion: salary, living; buyer: assetUid, offer. */
+  /** neighborLoan: neighborId, amount; fireSale: neighborId, assetUid, price; buyer: assetUid, offer. */
   params: Record<string, EventParam>;
 }
 
@@ -169,7 +174,6 @@ export interface PlayerState {
   dream: DreamState | null;  // у соседей-ботов мечты нет
   choice: PendingChoice | null; // нерешённая развилка; у ботов всегда null
   lastChoiceWeek: number;    // неделя последней развилки (0 — ещё не было)
-  promotions: number;        // сколько раз принято повышение с переездом (не больше PROMOTION_MAX)
   lent: LentLoan[];          // одолжено соседям
   goals: GoalsState | null;  // у ботов null
 }
@@ -243,7 +247,7 @@ export interface WeekReport {
 }
 
 export interface WorldState {
-  version: 5;
+  version: 6;
   seed: number;
   rng: number;               // текущее состояние ГПСЧ — вся случайность только через него
   nextUid: number;
@@ -403,10 +407,14 @@ export type ChoiceView =
     reason?: EngineError;    // почему нельзя одолжить (не хватает монет)
   }
   | {
-    kind: 'promotion'; uid: string;
-    salaryIncrease: number; livingIncrease: number;
-    netChange: number;       // salaryIncrease − livingIncrease
+    kind: 'fireSale'; uid: string; neighborId: string; assetUid: string; defId: string; level: number;
+    price: number;           // за сколько сосед отдаёт
+    usualPrice: number;      // сколько это стоило соседу (уплаченная цена с улучшениями)
+    weeklyIncome: number;    // сколько актив будет приносить игроку сейчас
+    paybackWeeks: number | null;
     freedomBefore: number; freedomAfter: number; // как FinanceView.freedomRatio
+    canAccept: boolean;
+    reason?: EngineError;    // не хватает монет или места
   }
   | {
     kind: 'buyer'; uid: string; assetUid: string; defId: string; level: number;
@@ -418,6 +426,7 @@ export type ChoiceView =
 
 export interface RumorView {
   kind: WorldEventKind;
+  source: RumorSource;
   fromWeek: number;          // слух называет недели fromWeek..toWeek
   toWeek: number;
   /** Точная неделя — тем, у кого хватает знаний (RUMOR_EXACT_KNOWLEDGE); иначе null. */

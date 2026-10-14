@@ -73,11 +73,15 @@ export function DealsTab() {
       <div className="market">
         <span className={`chip ${fish.tone}`}>{fish.text}</span>
         <span className={`chip ${tourism.tone}`}>{tourism.text}</span>
-        {rumors.map((rumor, i) => (
-          <span key={`${rumor.kind}-${rumor.fromWeek}-${i}`} className={`chip rumor-chip ${rumor.kind === 'storm' || rumor.kind === 'crisis' ? 'neg' : 'pos'}`} title={rumor.exactWeek !== null ? t.ui.rumors.exactHint : undefined}>
-            {t.ui.rumors.chip(t.ui.rumors.kinds[rumor.kind], rumorWhen(rumor, world.week))}
-          </span>
-        ))}
+        {rumors.map((rumor, i) => {
+          const source = rumor.source ?? 'reliable';
+          const hint = [t.ui.rumors.sourceHint[source], rumor.exactWeek !== null ? t.ui.rumors.exactHint : ''].filter(Boolean).join(' ');
+          return (
+            <span key={`${rumor.kind}-${rumor.fromWeek}-${i}`} className={`chip rumor-chip ${source} ${rumor.kind === 'storm' || rumor.kind === 'crisis' ? 'neg' : 'pos'}`} title={hint}>
+              {t.ui.rumors.chip(t.ui.rumors.kinds[rumor.kind], rumorWhen(rumor, world.week), t.ui.rumors.source[source])}
+            </span>
+          );
+        })}
       </div>
       {views.length === 0
         ? <div className="empty">{t.ui.deals.empty}</div>

@@ -48,9 +48,9 @@ describe('слухи', () => {
     player(world, 'bot-mia').knowledge = R.RUMOR_EXACT_KNOWLEDGE;
     const report = reports(world);
     expect(rollWorldEvent(world, new ChoiceRng(), report)).toEqual([]);
-    expect(world.upcoming).toEqual([{ kind: 'storm', week: 3, windowStart: 3, announcedWeek: 1 }]);
+    expect(world.upcoming).toEqual([{ kind: 'storm', week: 3, windowStart: 3, announcedWeek: 1, real: true, source: 'reliable' }]);
     for (const p of world.players) {
-      expect(report[p.id].events[0]).toMatchObject({ id: 'rumor', tone: 'neutral', params: { kind: 'storm', fromWeek: 3, toWeek: 4 } });
+      expect(report[p.id].events[0]).toMatchObject({ id: 'rumor', tone: 'neutral', params: { kind: 'storm', source: 'reliable', fromWeek: 3, toWeek: 4 } });
       expect(report[p.id].events[0].params?.exactWeek).toBe(p.knowledge >= R.RUMOR_EXACT_KNOWLEDGE ? 3 : undefined);
     }
     rollWorldEvent(world, new ChoiceRng(), report);
@@ -61,14 +61,16 @@ describe('слухи', () => {
   it('представления отсортированы, точность зависит от знаний, чтение не меняет мир', () => {
     const world = soloWorld();
     world.upcoming = [
-      { kind: 'crisis', week: 5, windowStart: 4, announcedWeek: 1 },
-      { kind: 'fishShoal', week: 3, windowStart: 3, announcedWeek: 1 },
+      { kind: 'crisis', week: 5, windowStart: 4, announcedWeek: 1, real: false, source: 'gossip' },
+      { kind: 'fishShoal', week: 3, windowStart: 3, announcedWeek: 1, real: true, source: 'reliable' },
     ];
     const before = JSON.stringify(world);
     expect(rumorViews(world, 'p1').map((r) => [r.kind, r.exactWeek])).toEqual([['fishShoal', null], ['crisis', null]]);
     expect(JSON.stringify(world)).toBe(before);
     player(world).knowledge = R.RUMOR_EXACT_KNOWLEDGE;
     expect(rumorViews(world, 'p1').map((r) => r.exactWeek)).toEqual([3, 5]);
+    expect(rumorViews(world, 'p1').map((r) => r.source)).toEqual(['reliable', 'gossip']);
+    expect(rumorViews(world, 'p1').every((r) => !('real' in r))).toBe(true);
     expect(rumorViews(world, 'missing')).toEqual([]);
   });
 
@@ -103,12 +105,63 @@ describe('слухи', () => {
 
   it.each(['fishShoal', 'touristBoom', 'crisis'] as const)('сохраняет рыночные эффекты %s', (kind) => {
     const world = soloWorld();
-    world.upcoming = [{ kind, week: 1, windowStart: 1, announcedWeek: -1 }];
+    world.upcoming = [{ kind, week: 1, windowStart: 1, announcedWeek: -1, real: true, source: 'reliable' }];
     vi.spyOn(Rng.prototype, 'chance').mockReturnValue(false);
     expect(rollWorldEvent(world, new Rng(0), reports(world))[0].id).toBe(kind);
     expect(world.market.fishShock).toBe(kind === 'fishShoal' ? R.SHOAL_FISH_SHOCK : kind === 'crisis' ? R.CRISIS_FISH_SHOCK : 0);
     expect(world.market.tourismShock).toBe(kind === 'touristBoom' ? R.BOOM_TOURISM_SHOCK : kind === 'crisis' ? R.CRISIS_TOURISM_SHOCK : 0);
     expect(world.upcoming).toEqual([]);
+  });
+
+  it.each(['storm', 'fishShoal', 'touristBoom', 'crisis'] as const)('ложный %s только опровергается у каждого игрока', (kind) => {
+    const world = newWorld();
+    const asset = giveAsset(world, 'p1', 'boat');
+    player(world).insured = true;
+    player(world).insuranceFrom = 1;
+    world.upcoming = [{ kind, week: 1, windowStart: 1, announcedWeek: -1, real: false, source: 'gossip' }];
+    const before = structuredClone(world.market);
+    const report = reports(world);
+    vi.spyOn(Rng.prototype, 'chance').mockReturnValue(false);
+    expect(rollWorldEvent(world, new Rng(0), report)).toEqual([]);
+    expect(world.market).toEqual(before);
+    expect(asset.damaged).toBe(false);
+    expect(player(world).goals!.insuredStorm).toBe(false);
+    expect(world.upcoming).toEqual([]);
+    for (const p of world.players) expect(report[p.id].events).toEqual([{ id: 'rumorFalse', tone: 'neutral', params: { kind } }]);
+  });
+
+  it('надёжные слухи сбываются примерно в 9/10, болтовня — меньше чем в половине (500 сидов)', () => {
+    const counts = { reliable: { real: 0, total: 0 }, gossip: { real: 0, total: 0 } };
+    for (let seed = 1; seed <= 500; seed++) {
+      const world = soloWorld(seed);
+      const rng = new Rng(seed);
+      for (let week = 1; week <= 104; week++) {
+        world.week = week;
+        const due = world.upcoming.find((e) => e.week === week);
+        const report = reports(world);
+        const events = rollWorldEvent(world, rng, report);
+        if (due) {
+          counts[due.source].total++;
+          counts[due.source].real += Number(due.real);
+          expect(events.map((e) => e.id)).toEqual(due.real ? [due.kind] : []);
+          expect(report.p1.events.some((e) => e.id === 'rumorFalse')).toBe(!due.real);
+        }
+        expect(new Set(world.upcoming.map((e) => e.week)).size).toBe(world.upcoming.length);
+        for (const e of world.upcoming.filter((e) => e.announcedWeek === week)) {
+          expect(report.p1.events).toContainEqual({ id: 'rumor', tone: 'neutral', params: {
+            kind: e.kind, source: e.source, fromWeek: e.windowStart, toWeek: e.windowStart + 1,
+          } });
+        }
+      }
+    }
+    const reliable = counts.reliable.real / counts.reliable.total;
+    const gossip = counts.gossip.real / counts.gossip.total;
+    expect(counts.reliable.total).toBeGreaterThan(1000);
+    expect(counts.gossip.total).toBeGreaterThan(1000);
+    expect(reliable).toBeGreaterThan(0.85);
+    expect(reliable).toBeLessThan(0.95);
+    expect(gossip).toBeGreaterThan(0.2);
+    expect(gossip).toBeLessThan(0.5);
   });
 });
 
@@ -131,7 +184,7 @@ describe('страховка заранее', () => {
     player(world).insured = true;
     player(world).insuranceFrom = 5;
     const asset = giveAsset(world, 'p1', 'boat');
-    world.upcoming = [{ kind: 'storm', week, windowStart: week - 1, announcedWeek: week - 2 }];
+    world.upcoming = [{ kind: 'storm', week, windowStart: week - 1, announcedWeek: week - 2, real: true, source: 'reliable' }];
     const report = reports(world);
     rollWorldEvent(world, new ChoiceRng(), report);
     expect(asset.damaged).toBe(week < 5);
@@ -160,7 +213,7 @@ describe('страховка заранее', () => {
   it('оформление после слуха не успевает даже к шторму с максимальным сроком', () => {
     let world = soloWorld();
     world.week = 2; // слух объявлен в конце первой недели
-    world.upcoming = [{ kind: 'storm', week: 5, windowStart: 4, announcedWeek: 1 }];
+    world.upcoming = [{ kind: 'storm', week: 5, windowStart: 4, announcedWeek: 1, real: true, source: 'reliable' }];
     world = applyAction(world, { type: 'setInsurance', playerId: 'p1', on: true }).world;
     expect(insuranceActive(player(world), 5)).toBe(false);
   });
@@ -177,7 +230,7 @@ describe('развилки', () => {
     generateChoice(world, player(world), new ChoiceRng());
     expect(player(world).choice).toMatchObject({ kind: 'neighborLoan', week: 5 });
     const first = structuredClone(player(world).choice);
-    generateChoice(world, player(world), new ChoiceRng('promotion'));
+    generateChoice(world, player(world), new ChoiceRng('fireSale'));
     expect(player(world).choice).toEqual(first);
     player(world).choice = null;
     world.week++;
@@ -210,12 +263,8 @@ describe('развилки', () => {
     generateChoice(world, me, new ChoiceRng());
     expect(me.choice).toBeNull();
     me.employed = true;
-    me.promotions = R.PROMOTION_MAX;
     generateChoice(world, me, new ChoiceRng());
     expect(me.choice).toBeNull();
-    me.promotions = 0;
-    generateChoice(world, me, new ChoiceRng('neighborLoan'));
-    expect(me.choice!.kind).toBe('promotion');
   });
 
   it('выдаёт деньги соседу, счастье человеку и срок возврата; нехватка сохраняет развилку', () => {
@@ -241,19 +290,9 @@ describe('развилки', () => {
   it('отказ ничего не тратит, нет развилки — noChoice', () => {
     const world = soloWorld();
     expect(resolve(world).error).toEqual({ code: 'noChoice' });
-    pending(world, 'promotion', { salary: R.PROMOTION_SALARY, living: R.PROMOTION_LIVING });
+    pending(world, 'fireSale', { neighborId: 'bot-mia', assetUid: 'missing', price: 200 });
     const after = resolve(world, false).world;
     expect(player(after)).toEqual({ ...player(world), choice: null });
-  });
-
-  it('повышение меняет расходы и зарплату; представление считает свободу как financeView', () => {
-    const world = soloWorld();
-    giveAsset(world, 'p1', 'boat');
-    pending(world, 'promotion', { salary: R.PROMOTION_SALARY, living: R.PROMOTION_LIVING });
-    const view = choiceView(world, 'p1');
-    const after = resolve(world).world;
-    expect(player(after)).toMatchObject({ salary: R.SALARY + R.PROMOTION_SALARY, living: R.LIVING + R.PROMOTION_LIVING, promotions: 1 });
-    expect(view).toMatchObject({ netChange: 5, freedomBefore: financeView(world, 'p1').freedomRatio, freedomAfter: financeView(after, 'p1').freedomRatio });
   });
 
   it('предложение покупателя учитывает улучшения, продажу, недельный поток и страховую премию', () => {
@@ -286,10 +325,122 @@ describe('развилки', () => {
 
   it('в начале расчёта снимает нерешённую развилку без события и последствий', () => {
     const world = soloWorld();
-    pending(world, 'promotion', { salary: 40, living: 35 });
+    pending(world, 'fireSale', { neighborId: 'bot-mia', assetUid: 'missing', price: 200 });
     vi.spyOn(Rng.prototype, 'chance').mockReturnValue(false);
     settleWeek(world, []);
-    expect(player(world)).toMatchObject({ choice: null, promotions: 0, salary: R.SALARY, living: R.LIVING });
+    expect(player(world)).toMatchObject({ choice: null, salary: R.SALARY, living: R.LIVING });
+  });
+});
+
+describe('распродажа у соседа', () => {
+  function saleWorld() {
+    const world = newWorld();
+    world.week = 4;
+    const seller = player(world, 'bot-boris');
+    seller.cash = R.FIRE_SALE_TROUBLE_CASH - 1;
+    const asset = giveAsset(world, seller.id, 'boat', { level: 3, price: 1350, income: 92, upkeep: 31, slotIndex: 3 });
+    return { world, seller, asset, me: player(world) };
+  }
+
+  it('выбирает беднейшего подходящего, затем должника ростовщика; доступна без денег', () => {
+    const { world, me, asset } = saleWorld();
+    me.cash = 0;
+    player(world, 'bot-timur').cash = 0; // беднее, но нет подходящего актива
+    giveAsset(world, 'bot-timur', 'deposit');
+    giveAsset(world, 'bot-timur', 'garden');
+    giveAsset(world, 'bot-timur', 'boat', { damaged: true });
+    generateChoice(world, me, new ChoiceRng('fireSale'));
+    expect(me.choice).toMatchObject({ kind: 'fireSale', params: { neighborId: 'bot-boris', assetUid: asset.uid, price: 810 } });
+    expect(choiceView(world, 'p1')).toMatchObject({ canAccept: false, reason: { code: 'notEnoughCash', missing: 810 } });
+    me.choice = null;
+    me.lastChoiceWeek = 0;
+    const other = giveAsset(world, 'bot-mia', 'cottage');
+    player(world, 'bot-mia').loans = [{ uid: 'l', principal: 100, weeklyRate: R.EMERGENCY_RATE, emergency: true }];
+    generateChoice(world, me, new ChoiceRng('fireSale'));
+    expect(me.choice!.params).toMatchObject({ neighborId: 'bot-mia', assetUid: other.uid });
+  });
+
+  it('нет распродажи у благополучных или при заполненном слоте выбранного актива', () => {
+    const { world, me, seller } = saleWorld();
+    me.cash = 0;
+    seller.cash = R.FIRE_SALE_TROUBLE_CASH;
+    generateChoice(world, me, new ChoiceRng('fireSale'));
+    expect(me.choice).toBeNull();
+    seller.cash--;
+    for (let i = 0; i < 4; i++) giveAsset(world, 'p1', 'boat', { slotIndex: i, damaged: true });
+    generateChoice(world, me, new ChoiceRng('fireSale'));
+    expect(me.choice).toBeNull();
+    const cottage = giveAsset(world, seller.id, 'cottage');
+    generateChoice(world, me, new ChoiceRng('fireSale'));
+    expect(me.choice).toBeNull();
+    seller.owned = [cottage];
+    generateChoice(world, me, new ChoiceRng('fireSale'));
+    expect(me.choice!.params.assetUid).toBe(cottage.uid);
+  });
+
+  it('передаёт улучшенный актив, сохраняет его поток, занимает свободное место и платит соседу', () => {
+    const { world, me, seller, asset } = saleWorld();
+    me.cash = 1000;
+    me.insured = true;
+    giveAsset(world, 'p1', 'boat', { slotIndex: 0 });
+    giveAsset(world, 'p1', 'boat', { slotIndex: 2 });
+    generateChoice(world, me, new ChoiceRng('fireSale'));
+    const before = JSON.stringify(world);
+    const view = choiceView(world, 'p1');
+    const income = currentIncome(asset, world.market, me.knowledge);
+    expect(view).toMatchObject({ kind: 'fireSale', level: 3, price: 810, usualPrice: 1350, weeklyIncome: income,
+      paybackWeeks: Math.ceil(810 / (income - asset.upkeep)), canAccept: true,
+      freedomBefore: financeView(world, 'p1').freedomRatio });
+    expect(JSON.stringify(world)).toBe(before);
+    const result = resolve(world);
+    expect(result.error).toBeUndefined();
+    expect(player(result.world).owned.at(-1)).toEqual({ ...asset, price: 810, boughtWeek: 4, slotIndex: 1 });
+    expect(player(result.world).cash).toBe(190);
+    expect(player(result.world, seller.id).cash).toBe(seller.cash + 810);
+    expect(player(result.world, seller.id).owned).toEqual([]);
+    expect(player(result.world).choice).toBeNull();
+    expect(view).toMatchObject({ freedomAfter: financeView(result.world, 'p1').freedomRatio });
+    expect(JSON.stringify(world)).toBe(before);
+  });
+
+  it.each(['cash', 'slot', 'sold', 'damaged', 'neighbor'] as const)('проверяет изменения к моменту решения: %s', (change) => {
+    const { world, me, seller, asset } = saleWorld();
+    me.cash = 1000;
+    generateChoice(world, me, new ChoiceRng('fireSale'));
+    if (change === 'cash') me.cash = 809;
+    if (change === 'slot') for (let i = 0; i < 4; i++) giveAsset(world, 'p1', 'boat', { slotIndex: i });
+    if (change === 'sold') seller.owned = [];
+    if (change === 'damaged') asset.damaged = true;
+    if (change === 'neighbor') world.players = world.players.filter((p) => p.id !== seller.id);
+    const before = structuredClone(world);
+    const result = resolve(world);
+    const gone = ['sold', 'damaged', 'neighbor'].includes(change);
+    const error = change === 'cash' ? { code: 'notEnoughCash', missing: 1 }
+      : change === 'slot' ? { code: 'slotFull', slot: 'pier' } : { code: 'noSuchAsset' };
+    expect(result.error).toEqual(error);
+    expect(result.world).toEqual(gone ? { ...before, players: before.players.map((p) => p.id === 'p1' ? { ...p, choice: null } : p) } : before);
+    if (gone) expect(choiceView(world, 'p1')).toBeNull();
+    else expect(choiceView(world, 'p1')).toMatchObject({ canAccept: false, reason: error });
+  });
+
+  it('нулевой чистый доход не имеет окупаемости; стратегия соблюдает запас и предел 30 недель', () => {
+    const { world, me, seller, asset } = saleWorld();
+    world.market.fish = 1;
+    asset.income = 20;
+    asset.upkeep = 0;
+    pending(world, 'fireSale', { neighborId: seller.id, assetUid: asset.uid, price: 600 });
+    const decide = (options = {}) => makeSensible(options)(world, me);
+    me.cash = 680;
+    expect(decide()).toMatchObject({ accept: true });
+    expect(decide({ fireSales: false })).toMatchObject({ accept: false });
+    me.cash--;
+    expect(decide()).toMatchObject({ accept: false });
+    me.cash = 1000;
+    me.choice!.params.price = 610;
+    expect(decide()).toMatchObject({ accept: false });
+    asset.upkeep = 20;
+    expect(choiceView(world, 'p1')).toMatchObject({ paybackWeeks: null });
+    expect(decide()).toMatchObject({ accept: false });
   });
 });
 
@@ -421,7 +572,7 @@ describe('цели', () => {
   });
 });
 
-describe('миграция v4 → v5', () => {
+describe('миграция старых версий → v6', () => {
   it('добавляет поля, сохраняет действующую страховку, вход не меняет', () => {
     const world = newWorld();
     player(world).insured = true;
@@ -433,17 +584,18 @@ describe('миграция v4 → v5', () => {
     const before = JSON.stringify(raw);
     const migrated = migrateWorld(raw)!;
     expect(JSON.stringify(raw)).toBe(before);
-    expect(migrated).toMatchObject({ version: 5, upcoming: [] });
-    expect(player(migrated)).toMatchObject({ insuranceFrom: 12, choice: null, lastChoiceWeek: 0, promotions: 0, lent: [], goals: { active: ['study', 'cushion', 'sectors'] } });
+    expect(migrated).toMatchObject({ version: 6, upcoming: [] });
+    expect(player(migrated)).toMatchObject({ insuranceFrom: 12, choice: null, lastChoiceWeek: 0, lent: [], goals: { active: ['study', 'cushion', 'sectors'] } });
+    expect(player(migrated)).not.toHaveProperty('promotions');
     expect(insuranceActive(player(migrated), 12)).toBe(true);
     expect(migrated.players.slice(1).every((p) => p.goals === null && p.insuranceFrom === null)).toBe(true);
     expect(migrateWorld(migrated)).toEqual(migrated);
   });
 
-  it('v5 сохраняет текущие слухи, развилки и цели; неполный v5 отвергается', () => {
+  it('v6 сохраняет текущие слухи, развилки и цели; неполный v6 отвергается', () => {
     const world = soloWorld();
-    world.upcoming = [{ kind: 'storm', week: 4, windowStart: 3, announcedWeek: 1 }];
-    pending(world, 'promotion', { salary: 40, living: 35 });
+    world.upcoming = [{ kind: 'storm', week: 4, windowStart: 3, announcedWeek: 1, real: true, source: 'reliable' }];
+    pending(world, 'fireSale', { neighborId: 'bot-mia', assetUid: 'missing', price: 200 });
     expect(migrateWorld(world)).toEqual(world);
     const bad = JSON.parse(JSON.stringify(world));
     delete bad.players[0].insuranceFrom;
@@ -451,6 +603,38 @@ describe('миграция v4 → v5', () => {
     const badGoals = JSON.parse(JSON.stringify(world));
     badGoals.players[0].goals.active = ['unknown'];
     expect(migrateWorld(badGoals)).toBeNull();
+  });
+
+  it.each(['promotion', 'neighborLoan', 'buyer'])('v5 → v6: слухи настоящие и надёжные, развилка %s', (kind) => {
+    const raw = JSON.parse(JSON.stringify(newWorld()));
+    raw.version = 5;
+    raw.upcoming = [{ kind: 'storm', week: 4, windowStart: 3, announcedWeek: 1 }];
+    for (const p of raw.players) p.promotions = 1;
+    raw.players[0].choice = { uid: 'old', kind, week: 2,
+      params: kind === 'promotion' ? { salary: 40, living: 35 } : kind === 'buyer'
+        ? { assetUid: 'a', offer: 500 } : { neighborId: 'bot-mia', amount: 200 } };
+    const before = structuredClone(raw);
+    const migrated = migrateWorld(raw)!;
+    expect(raw).toEqual(before);
+    expect(migrated.version).toBe(6);
+    expect(migrated.upcoming).toEqual([{ ...raw.upcoming[0], real: true, source: 'reliable' }]);
+    expect(migrated.players.every((p) => !('promotions' in p))).toBe(true);
+    expect(player(migrated).choice).toEqual(kind === 'promotion' ? null : raw.players[0].choice);
+    expect(player(migrated).goals).toEqual(raw.players[0].goals);
+    expect(migrateWorld(migrated)).toEqual(migrated);
+    delete raw.players[0].promotions;
+    expect(migrateWorld(raw)).toBeNull();
+  });
+
+  it('v6 проверяет источник и правду слуха, сохраняет ложный слух', () => {
+    const world = soloWorld();
+    world.upcoming = [{ kind: 'crisis', week: 4, windowStart: 3, announcedWeek: 1, real: false, source: 'gossip' }];
+    expect(migrateWorld(world)).toEqual(world);
+    for (const [key, value] of [['real', undefined], ['real', 1], ['source', undefined], ['source', 'unknown']] as const) {
+      const bad = JSON.parse(JSON.stringify(world));
+      bad.upcoming[0][key] = value;
+      expect(migrateWorld(bad)).toBeNull();
+    }
   });
 });
 
@@ -465,11 +649,13 @@ describe('стратегии', () => {
     const bungalow = putOffer(world, 'bungalow', { price: kind === 'crisis' ? 200 : 600 });
     if (kind !== 'crisis') putOffer(world, 'cottage', { price: 200, income: 100 });
     const baseline = makeSensible()(world, player(world));
-    world.upcoming = [{ kind, week: 4, windowStart: 3, announcedWeek: 1 }];
+    world.upcoming = [{ kind, week: 4, windowStart: 3, announcedWeek: 1, real: true, source: 'reliable' }];
     const listener = makeSensible({ listenRumors: true })(world, player(world));
     const expected = kind === 'touristBoom' ? bungalow.uid : boat.uid;
     expect(listener).toMatchObject({ type: 'buyOffer', offerUid: expected });
     expect(listener).not.toEqual(baseline);
+    world.upcoming[0].source = 'gossip';
+    expect(makeSensible({ listenRumors: true })(world, player(world))).toEqual(baseline);
   });
 
   it('разумный проверяет соседский долг, net и собственный запас; щедрый принимает доступный заём', () => {
@@ -488,11 +674,8 @@ describe('стратегии', () => {
     expect(decide()).toMatchObject({ accept: false });
   });
 
-  it('разумный отказывается от переезда и продаёт за 25 недель дохода', () => {
+  it('разумный продаёт за 25 недель дохода', () => {
     const world = soloWorld();
-    pending(world, 'promotion', { salary: 40, living: 35 });
-    expect(makeSensible()(world, player(world))).toMatchObject({ accept: false });
-    expect(makeSensible({ alwaysPromote: true })(world, player(world))).toMatchObject({ accept: true });
     world.market.fish = 1;
     const asset = giveAsset(world, 'p1', 'boat', { income: 20 });
     pending(world, 'buyer', { assetUid: asset.uid, offer: 500 });

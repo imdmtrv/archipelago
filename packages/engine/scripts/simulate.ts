@@ -34,6 +34,7 @@ interface Outcome {
   lent: number;               // выданные соседям монеты
   returned: number;           // возвращённые монеты без благодарности
   goals100: number;           // выполнено целей к 100-й неделе
+  rumors: Record<'reliable' | 'gossip', { total: number; real: number }>;
 }
 
 function hasNaN(value: unknown): boolean {
@@ -49,6 +50,7 @@ function runGame(seed: number, weeks: number, humanPolicy: Policy): Map<string, 
     freedomWeek: null, debt: 0, burnouts: 0, emergencyWeeks: 0, netWorth: 0, scamsLost: 0,
     dreamWeek: null, forcedReturns: 0, quitAfterFreedom: false, joySum: 0, joyWeeks: 0,
     bestLevel: 0, passive: 0, upgrades: 0, lent: 0, returned: 0, goals100: 0,
+    rumors: { reliable: { total: 0, real: 0 }, gossip: { total: 0, real: 0 } },
   }]));
   for (let w = 0; w < weeks; w++) {
     const turn = runBotTurn(world, HUMAN_ID, humanPolicy);
@@ -56,6 +58,12 @@ function runGame(seed: number, weeks: number, humanPolicy: Policy): Map<string, 
     stats.get(HUMAN_ID)!.upgrades += turn.actions.filter((a) => a.type === 'upgradeAsset').length;
     stats.get(HUMAN_ID)!.lent += turn.world.players[0].lent
       .filter((l) => !world.players[0].lent.some((old) => old.uid === l.uid)).reduce((sum, l) => sum + l.amount, 0);
+    const due = turn.world.upcoming.find((e) => e.week === turn.world.week);
+    if (due) {
+      const counts = stats.get(HUMAN_ID)!.rumors[due.source];
+      counts.total++;
+      counts.real += Number(due.real);
+    }
     const result = applyAction(turn.world, { type: 'endWeek' });
     if (result.error) throw new Error(result.error.code);
     world = result.world;
@@ -315,9 +323,16 @@ function checkEngagementTargets(sum: Map<string, Summary>, outcomes: Map<string,
   for (const label of [LABELS.sensible, ...Object.values(ENGAGEMENT_LABELS).map((l) => `human:${l}`)]) {
     console.log(`${label}: свобода ${sum.get(label)!.median}; возврат ${(returned(label) * 100).toFixed(1)}%; цели к 100-й ${percentile(outcomes.get(label)!.map((o) => o.goals100).sort((a, b) => a - b), 0.5)}`);
   }
+  for (const source of ['reliable', 'gossip'] as const) {
+    const rows = outcomes.get(LABELS.sensible)!;
+    const total = rows.reduce((s, o) => s + o.rumors[source].total, 0);
+    const real = rows.reduce((s, o) => s + o.rumors[source].real, 0);
+    console.log(`Слухи ${source}: сбылось ${real}/${total} (${(100 * real / total).toFixed(1)}%)`);
+  }
   console.log('');
   return [
-    ['Переезжает всегда: свобода не раньше разумного', median(ENGAGEMENT_LABELS.promote) >= baseline],
+    ['Распродажи: разумный не позже отказавшегося и раньше не больше чем на 4 недели',
+      baseline <= median(ENGAGEMENT_LABELS.noFireSales) && baseline >= median(ENGAGEMENT_LABELS.noFireSales) - 4],
     ['Одалживает всем: свобода позже разумного не больше чем на 6 недель', median(ENGAGEMENT_LABELS.lend) >= baseline && median(ENGAGEMENT_LABELS.lend) <= baseline + 6],
     ['Разумный получает большую долю возврата, чем одалживающий всем', returned(LABELS.sensible) > returned(`human:${ENGAGEMENT_LABELS.lend}`)],
     ['Слушает слухи: свобода не позже разумного и раньше не больше чем на 3 недели', median(ENGAGEMENT_LABELS.rumors) <= baseline && median(ENGAGEMENT_LABELS.rumors) >= baseline - 3],

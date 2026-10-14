@@ -45,7 +45,6 @@ function newPlayer(id: string, name: string, islandName: string, botStyle?: BotS
     dream: botStyle ? null : newDreamState(),
     choice: null,
     lastChoiceWeek: 0,
-    promotions: 0,
     lent: [],
     // Цели — тоже только у человека.
     goals: botStyle ? null : newGoalsState(),
@@ -56,7 +55,7 @@ function newPlayer(id: string, name: string, islandName: string, botStyle?: BotS
 
 export function createWorld(opts: { seed: number; playerName: string; islandName: string }): WorldState {
   const world: WorldState = {
-    version: 5,
+    version: 6,
     seed: opts.seed,
     rng: opts.seed >>> 0,
     nextUid: 1,

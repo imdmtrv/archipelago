@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { choiceView, type ChoiceView } from '@arch/engine';
 import { HUMAN, useGame } from '../store';
-import { assetCopy, coins, displayPlayer, errorText, useI18n } from '../i18n';
+import { assetCopy, coins, displayPlayer, errorText, useI18n, weeksAcc } from '../i18n';
 import { percent } from './text';
 
 /** Решение живёт в движке; закрытие окна оставляет его на следующую попытку хода. */
@@ -51,15 +51,22 @@ export function ChoiceModal() {
       <div className="choice-money"><span>{loan.amount}</span><b>{coins(view.amount)}</b><small>{loan.back(coins(view.returnAmount))}</small></div>
       <button className="link-btn" onClick={() => { close(); showNeighbor(view.neighborId); }}>{loan.viewNeighbor}</button>
     </>;
-  } else if (view.kind === 'promotion') {
-    const promotion = copy.promotion;
-    title = promotion.title;
-    text = promotion.text(coins(view.salaryIncrease), coins(view.livingIncrease));
-    hint = promotion.hint;
-    accept = promotion.accept;
-    decline = promotion.decline;
-    success = promotion.done;
-    details = <><div className="choice-money pos">{promotion.net(coins(view.netChange))}</div><ChoiceFreedom view={view} /></>;
+  } else if (view.kind === 'fireSale') {
+    const neighbor = world.players.find((p) => p.id === view.neighborId);
+    const name = neighbor ? displayPlayer(neighbor).name : view.neighborId;
+    const sale = copy.fireSale;
+    const asset = assetCopy(view.defId, view.level);
+    title = sale.title(name);
+    text = sale.text(name, view.neighborId === 'bot-mia', asset.accusative, coins(view.price), coins(view.usualPrice));
+    hint = sale.hint;
+    accept = sale.accept(coins(view.price));
+    decline = sale.decline;
+    success = sale.bought(asset.title, coins(view.price));
+    details = <>
+      <div className="choice-money pos">{sale.income(coins(view.weeklyIncome))}{view.paybackWeeks !== null && <small>{sale.payback(weeksAcc(view.paybackWeeks))}</small>}</div>
+      <ChoiceFreedom view={view} />
+      <button className="link-btn" onClick={() => { close(); showNeighbor(view.neighborId); }}>{copy.neighborLoan.viewNeighbor}</button>
+    </>;
   } else {
     const buyer = copy.buyer;
     const asset = assetCopy(view.defId, view.level);
@@ -71,8 +78,8 @@ export function ChoiceModal() {
     success = buyer.sold(asset.title, coins(view.offer));
     details = <><div className="choice-money">{buyer.income(coins(view.weeklyIncome))}</div><ChoiceFreedom view={view} /></>;
   }
-  const blocked = view.kind === 'neighborLoan' && !view.canAccept;
-  const reason = view.kind === 'neighborLoan' && view.reason ? errorText(view.reason) : undefined;
+  const blocked = view.kind !== 'buyer' && !view.canAccept;
+  const reason = view.kind !== 'buyer' && view.reason ? errorText(view.reason) : undefined;
   const resolve = (accepted: boolean) => {
     if (act({ type: 'resolveChoice', playerId: HUMAN, accept: accepted }, accepted ? success : copy.declined)) close();
   };
@@ -94,7 +101,7 @@ export function ChoiceModal() {
   );
 }
 
-function ChoiceFreedom({ view }: { view: Extract<ChoiceView, { kind: 'promotion' | 'buyer' }> }) {
+function ChoiceFreedom({ view }: { view: Extract<ChoiceView, { kind: 'fireSale' | 'buyer' }> }) {
   const { t } = useI18n();
   const before = percent(view.freedomBefore), after = percent(view.freedomAfter);
   return <div className={`freedom-line ${after < before ? 'neg' : after > before ? 'pos' : ''}`}>{t.ui.choices.freedom(before, after)}</div>;

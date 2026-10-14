@@ -345,18 +345,34 @@ export const en: Dict = {
     },
     rumor: {
       title: 'Rumor',
-      storm: (when) =>
-        `Old fishermen say a storm is coming ${when} — boats and bungalows could take a beating. Insurance does not start right away: arrange it in advance.`,
-      fishShoal: (when) =>
-        `Whispers around the harbor say a huge fish shoal will arrive ${when}. Fishing ventures will earn more.`,
-      touristBoom: (when) =>
-        `The ferry company boasts it will bring crowds of tourists ${when}. Bungalows and cafés are in for a good season.`,
-      crisis: (when) =>
-        `Traders look grim: a downturn will hit ${when}. Tourists will stay home, fish prices will fall, and property will be hard to sell at a good price.`,
+      reliable: {
+        storm: (when) =>
+          `Old fishermen are certain: a storm is coming ${when}, and boats and bungalows could take a hit. Insurance does not take effect right away — arrange it in advance.`,
+        fishShoal: (when) =>
+          `Fishermen from the outer islands spotted a huge shoal: it will reach the archipelago ${when}. Fishing businesses will earn more.`,
+        touristBoom: (when) =>
+          `The steamship company is already selling tickets: crowds of tourists will arrive ${when}. Bungalows and cafés are in for a good season.`,
+        crisis: (when) =>
+          `The archipelago bank warns: a downturn will start ${when}. Fewer tourists will visit, fish prices will drop, and selling property for a good price won't be an option.`,
+      },
+      gossip: {
+        storm: (when) =>
+          `People at the market are saying a storm is coming ${when}. Who knows if it's true — talk like that rarely comes true.`,
+        fishShoal: (when) =>
+          `Folks at the tavern swear a huge fish shoal is coming ${when}. But people promise all sorts of things in a tavern.`,
+        touristBoom: (when) =>
+          `Someone heard that lots of tourists are coming ${when}. Where the rumor came from, nobody knows.`,
+        crisis: (when) =>
+          `Neighbors are whispering that a downturn will hit ${when}. No way to check — maybe it's just fear talking.`,
+      },
+    },
+    rumorFalse: {
+      title: 'Rumor unconfirmed',
+      text: (kind) => `${kind} — the rumor didn't pan out. Market chatter is often wrong, while reliable sources rarely are.`,
     },
     goalDone: {
       title: (goal) => `Goal complete: ${goal}`,
-      text: (reward) => `Reward: ${reward}. A new goal is already waiting on the list.`,
+      text: (done, reward) => `${done} Reward: ${reward}.`,
     },
     neighborLoanReturned: {
       title: (name) => `${name}: loan repaid`,
@@ -705,15 +721,16 @@ export const en: Dict = {
         decline: 'Politely decline',
         lent: (name, coins) => `${name}: lent ${coins}`,
       },
-      promotion: {
-        title: 'Promotion with relocation',
-        text: (salary, living) =>
-          `The co-op offers a position in the big harbor: salary goes up by ${salary} a week, but living there costs ${living} more.`,
-        net: (coins) => `Keep ${coins} more each week`,
-        hint: 'Freedom is when passive income covers expenses. The higher your expenses, the farther the finish line.',
-        accept: 'Move',
-        decline: 'Stay',
-        done: 'You moved: salary and expenses went up',
+      fireSale: {
+        title: (name) => `${name} is selling off property`,
+        text: (name, _female, asset, price, usual) =>
+          `${name} fell into debt and is urgently selling ${asset} for ${price}. It usually costs ${usual}.`,
+        income: (coins) => `Will bring you ${coins} a week`,
+        payback: (weeks) => `Pays back in ${weeks}`,
+        hint: 'Spare cash is an opportunity: you can only buy good things cheap when you have a buffer.',
+        accept: (coins) => `Buy for ${coins}`,
+        decline: "Don't buy",
+        bought: (asset, coins) => `Bought: ${asset} for ${coins}`,
       },
       buyer: {
         title: (asset) => `Buyer for ${asset}`,
@@ -735,17 +752,61 @@ export const en: Dict = {
       done: (n, total) => `${n} of ${total} completed`,
       allDone: 'All goals completed — the island is proud of you!',
       items: {
-        study: { title: 'First lessons', text: 'Take a course: knowledge unlocks new deals and helps spot scams.' },
-        cushion: { title: 'Safety buffer', text: 'Keep three weeks of expenses in cash — in case of illness or a breakdown.' },
-        sectors: { title: 'Three baskets', text: "Income-producing assets in fish, tourism and steady income: don't put all your eggs in one basket." },
-        passive100: { title: 'A hundred a week', text: 'Passive income of 100 coins a week: money works while you are busy with other things.' },
-        upgrade: { title: 'Invest in what you have', text: 'Upgrade any asset: investing in what already works is a great path too.' },
-        noLoanShark: { title: 'No loan sharks', text: 'Fifteen weeks in a row without borrowing from a loan shark: keep a buffer.' },
-        share30: { title: 'A third from assets', text: 'Let assets bring in a third of all your income instead of salary.' },
-        halfway: { title: 'Halfway there', text: 'Passive income covers half of your expenses.' },
-        insuredStorm: { title: 'Protected', text: 'Weather a storm with active insurance. It has to be arranged in advance.' },
-        debtFree: { title: 'Debt-free', text: 'Pay off all loans: interest no longer eats into your income.' },
-        level150: { title: 'Confidence', text: 'Passive income is one and a half times expenses: your freedom has a safety margin.' },
+        study: {
+          title: 'First lessons',
+          text: 'Take a course: knowledge unlocks new deals and helps spot scams.',
+          done: 'First course completed: knowledge unlocks new deals and helps spot scams.',
+        },
+        cushion: {
+          title: 'Safety buffer',
+          text: 'Keep three weeks of expenses in cash — in case of illness or a breakdown.',
+          done: "Cash covers three weeks of expenses — illness or a breakdown won't catch you off guard.",
+        },
+        sectors: {
+          title: 'Three baskets',
+          text: "Income-producing assets in fish, tourism and steady income: don't put all your eggs in one basket.",
+          done: "You have income-producing assets in fish, tourism and steady income: a bad season in one won't bring everything down.",
+        },
+        passive100: {
+          title: 'A hundred a week',
+          text: 'Passive income of 100 coins a week: money works while you are busy with other things.',
+          done: 'Assets bring in 100 coins a week — money works while you are busy with other things.',
+        },
+        upgrade: {
+          title: 'Invest in what you have',
+          text: 'Upgrade any asset: investing in what already works is a great path too.',
+          done: 'You upgraded an asset: invested in what already works, and now it brings in more.',
+        },
+        noLoanShark: {
+          title: 'No loan sharks',
+          text: 'Fifteen weeks in a row without borrowing from a loan shark: keep a buffer.',
+          done: 'Fifteen weeks without a loan shark: your buffer is enough to avoid predatory interest.',
+        },
+        share30: {
+          title: 'A third from assets',
+          text: 'Let assets bring in a third of all your income instead of salary.',
+          done: 'A third of all your income comes from assets instead of salary.',
+        },
+        halfway: {
+          title: 'Halfway there',
+          text: 'Passive income covers half of your expenses.',
+          done: 'Passive income covers half of your expenses — halfway to freedom.',
+        },
+        insuredStorm: {
+          title: 'Protected',
+          text: 'Weather a storm with active insurance. It has to be arranged in advance.',
+          done: 'The storm passed and insurance covered everything: you arranged it in advance, and it paid off.',
+        },
+        debtFree: {
+          title: 'Debt-free',
+          text: 'Pay off all loans: interest no longer eats into your income.',
+          done: 'All loans are paid off: interest no longer eats into your income.',
+        },
+        level150: {
+          title: 'Confidence',
+          text: 'Passive income is one and a half times expenses: your freedom has a safety margin.',
+          done: 'Passive income is one and a half times expenses: your freedom now has a safety margin.',
+        },
       },
     },
     rumors: {
@@ -757,7 +818,12 @@ export const en: Dict = {
         thisWeek: 'this week',
         exact: (week) => `in week ${week}`,
       },
-      chip: (kind, when) => `${kind} ${when}`,
+      chip: (kind, when, source) => `${kind} ${when} · ${source}`,
+      source: { reliable: 'reliable', gossip: 'gossip' },
+      sourceHint: {
+        reliable: 'Reliable source: these rumors almost always come true.',
+        gossip: 'Market gossip: comes true less than half the time.',
+      },
       exactHint: 'Knowledge helps: you know the exact week.',
     },
   },

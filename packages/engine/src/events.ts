@@ -10,7 +10,7 @@ export type EventId =
   | 'illness' | 'breakdown' | 'gift' | 'raise' | 'burnout'
   | 'storm' | 'stormDamage' | 'stormInsured' | 'fishShoal' | 'touristBoom' | 'crisis'
   | 'scamCollapse' | 'emergencyLoan' | 'freedom'
-  | 'rumor' | 'goalDone' | 'neighborLoanReturned' | 'neighborLoanLate' | 'neighborLoanLost' | 'insuranceStarted'
+  | 'rumor' | 'rumorFalse' | 'goalDone' | 'neighborLoanReturned' | 'neighborLoanLate' | 'neighborLoanLost' | 'insuranceStarted'
   | 'dreamStage' | 'dreamDone' | 'freedomLevel' | 'freedomThreat' | 'threatOver' | 'backToWork';
 
 /** Число текстовых вариантов. Порядок и количество синхронны со словарями UI. */
@@ -99,25 +99,32 @@ function applyStorm(world: WorldState, rng: Rng, reports: Record<string, PlayerW
   return event('storm', 'bad', {}, { affectedAssetUids: damagedAll });
 }
 
-/** Исполняет запланированное событие и объявляет новый слух (не больше одного на неделю). */
+/** Исполняет запланированное событие или опровергает слух; на одну неделю — один слух. */
 export function rollWorldEvent(world: WorldState, rng: Rng, reports: Record<string, PlayerWeekReport>): GameEvent[] {
   const due = world.upcoming.find((e) => e.week === world.week);
   world.upcoming = world.upcoming.filter((e) => e.week !== world.week);
-  const events = due ? applyWorldEvent(due.kind, world, rng, reports) : [];
-  if (rng.chance(R.WORLD_EVENT_CHANCE)) {
+  const events = due?.real ? applyWorldEvent(due.kind, world, rng, reports) : [];
+  if (due && !due.real) {
+    for (const player of world.players) reports[player.id].events.push(event('rumorFalse', 'neutral', { kind: due.kind }));
+  }
+  const schedule = (real: boolean) => {
     const kind = rng.weighted(R.WORLD_EVENT_WEIGHTS);
     const week = world.week + rng.int(...R.RUMOR_LEAD);
     if (!world.upcoming.some((e) => e.week === week)) {
       const windowStart = week - rng.int(0, 1);
-      world.upcoming.push({ kind, week, windowStart, announcedWeek: world.week });
+      const source = real ? (rng.chance(R.RUMOR_RELIABLE_SHARE) ? 'reliable' : 'gossip')
+        : (rng.chance(R.FALSE_RUMOR_GOSSIP_SHARE) ? 'gossip' : 'reliable');
+      world.upcoming.push({ kind, week, windowStart, announcedWeek: world.week, real, source });
       for (const player of world.players) {
         reports[player.id].events.push({ id: 'rumor', tone: 'neutral', params: {
-          kind, fromWeek: windowStart, toWeek: windowStart + 1,
+          kind, source, fromWeek: windowStart, toWeek: windowStart + 1,
           ...(player.knowledge >= R.RUMOR_EXACT_KNOWLEDGE ? { exactWeek: week } : {}),
         } });
       }
     }
-  }
+  };
+  if (rng.chance(R.WORLD_EVENT_CHANCE)) schedule(true);
+  if (rng.chance(R.FALSE_RUMOR_CHANCE)) schedule(false);
   return events;
 }
 
