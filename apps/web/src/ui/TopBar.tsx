@@ -84,7 +84,7 @@ export function Emblem() {
 }
 
 export function TopBar() {
-  const { t, fmt } = useI18n();
+  const { t, fmt, lang, setLang } = useI18n();
   const world = useGame((s) => s.world)!;
   const resetGame = useGame((s) => s.resetGame);
   const me = getPlayer(world, HUMAN);
@@ -103,6 +103,13 @@ export function TopBar() {
           <div className="sub">{t.ui.week} {world.week}<span className="badge-detail">{me.freedomWeek ? ` · ${t.ui.neighbors.freedom} ${t.ui.epilogue.since(me.freedomWeek)}` : ''}{me.employed ? '' : ` · ${t.ui.neighbors.withoutWork.toLowerCase()}`}</span></div>
         </div>
         <NeighborsBar compact />
+        {/* На телефоне верхняя строка заполнена до предела: там язык — в приветствии и в настройках звука */}
+        {desktop && (
+          <div className="language-switch" aria-label={t.ui.language}>
+            <button type="button" className={lang === 'ru' ? 'active' : ''} onClick={() => setLang('ru')}>RU</button>
+            <button type="button" className={lang === 'en' ? 'active' : ''} onClick={() => setLang('en')}>EN</button>
+          </div>
+        )}
         <AudioControls />
         <ConfirmButton className="icon-btn" confirmText={t.ui.epilogue.resetConfirm} onConfirm={resetGame}>
           <span aria-label={t.ui.epilogue.newGame}>↺</span>

@@ -100,7 +100,7 @@ describe('аферы', () => {
     expect(r.lostAssetUids).toEqual([farm.uid]);
     const event = r.events.find((e) => e.id === 'scamCollapse')!;
     expect(event.tone).toBe('bad');
-    expect(event.params).toEqual({});
+    expect(event.params).toEqual({ defId: 'pearlFarm' });
     expect(player(world).owned).toHaveLength(0);
   });
 

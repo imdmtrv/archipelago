@@ -1,8 +1,8 @@
 // Соседи на экране: полоска с аватарами поверх острова и карточка соседа по нажатию.
 // Карточка — урок сравнения: те же правила, разные привычки, разный результат.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  assetViews, financeView, getPlayer, leaderboard,
+  assetViews, financeView, getPlayer, isScamVisible, leaderboard,
   type AssetView, type PlayerState, type WorldState,
 } from '@arch/engine';
 import { HUMAN, useGame, type FreedomHistory } from '../store';
@@ -55,7 +55,7 @@ function insightFor(world: WorldState, p: PlayerState, views: AssetView[]): Insi
   const statusUpkeep = status.reduce((s, v) => s + v.upkeep, 0);
   const emergency = p.loans.some((l) => l.emergency);
   // Афера выдаёт себя только тем, кто учился, — как на доске сделок
-  const scam = me.knowledge >= 1 && views.some((v) => v.def.kind === 'scam');
+  const scam = views.some((v) => isScamVisible(v.def.id, me.knowledge));
 
   if (emergency) {
     return { tone: 'bad', text: t.ui.neighbors.insightEmergency(shown.name, fmt(fin.expenses.interest), p.id === 'bot-mia') };
@@ -140,11 +140,22 @@ export function NeighborCard({ playerId, onClose }: { playerId: string; onClose:
   const color = colorOf(world, playerId);
   const insight = insightFor(world, p, views);
   const free = p.freedomWeek !== null;
+  const card = useRef<HTMLDivElement>(null);
 
+  // Закрывается по Esc и по нажатию в любом месте вне карточки (кроме аватаров соседей — они переключают карточку сами)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target || card.current?.contains(target) || target.closest('.nb-chip')) return;
+      onClose();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onDown, true);
+    };
   }, [onClose]);
 
   // Что стоит на острове: одинаковые объекты — одной плашкой «Баркас ×2»
@@ -164,7 +175,7 @@ export function NeighborCard({ playerId, onClose }: { playerId: string; onClose:
   const myNews = news.filter((n) => n.playerId === playerId).slice(0, 4);
 
   return (
-    <div className="neighbor-card panel" role="dialog" aria-label={`${t.ui.neighbors.neighbor.charAt(0).toUpperCase()}${t.ui.neighbors.neighbor.slice(1)}: ${shown.name}`}>
+    <div ref={card} className="neighbor-card panel" role="dialog" aria-label={`${t.ui.neighbors.neighbor.charAt(0).toUpperCase()}${t.ui.neighbors.neighbor.slice(1)}: ${shown.name}`}>
       <button className="icon-btn close" onClick={onClose} aria-label={t.ui.neighbors.close}>×</button>
       <div className="nc-head">
         <RingAvatar letter={shown.name.slice(0, 1)} color={color} ratio={fin.freedomRatio} size={52} free={free} />

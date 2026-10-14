@@ -1,15 +1,16 @@
 // Маяк на мысе и дом игрока на холме (с флагом и дымком из трубы).
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
-  AdditiveBlending, BoxGeometry, BufferAttribute, Color, ConeGeometry, DoubleSide, type Group, type Mesh, MeshBasicMaterial, MeshStandardMaterial,
+  AdditiveBlending, BufferAttribute, Color, ConeGeometry, DoubleSide, type Group, MeshBasicMaterial, MeshStandardMaterial,
 } from 'three';
 import { PAL } from '../palette';
-import { cached, cone, cyl, mat } from '../materials';
-import { FACE_CAMERA, HILL_POS, HILL_TOP, LIGHT_POS } from '../layout';
+import { cone, cyl } from '../materials';
+import { LIGHT_POS } from '../layout';
 import { useBus } from '../bus';
-import { House, M, Smoke, chimneyTop, noRay } from '../models/parts';
+import { M, noRay } from '../models/parts';
 import { Baked } from '../models/Baked';
+export { Home } from './Home';
 
 const H = 4.6, SEGS = 4;
 const LAMP_Y = 0.5 + H + 0.16 + 0.37;
@@ -62,35 +63,6 @@ export function Lighthouse() {
       <group ref={beam} position={[0, LAMP_Y, 0]} visible={false}>
         <mesh geometry={beamGeo} material={beamMat} rotation={[0, 0, Math.PI / 2 - 0.05]} raycast={noRay} />
       </group>
-    </group>
-  );
-}
-
-const flagGeo = () => cached('homeFlag', () => new BoxGeometry(0.9, 0.55, 0.04).translate(0.45, 0, 0));
-
-export function Home() {
-  const bus = useBus();
-  const group = useRef<Group>(null!);
-  const flag = useRef<Mesh>(null!);
-
-  useLayoutEffect(() => {
-    bus.anchors.set('home', { obj: group.current, h: 5.2 });
-    return () => { bus.anchors.delete('home'); };
-  }, [bus]);
-
-  useFrame(() => {
-    const { waveTime: t, k } = bus.weather;
-    flag.current.rotation.y = Math.sin(t * 2.4 * (1 + 0.6 * k)) * 0.35 * (1 + 0.5 * k);
-  });
-
-  return (
-    <group ref={group} position={[HILL_POS.x, HILL_TOP, HILL_POS.z]} rotation={[0, FACE_CAMERA, 0]}>
-      <Baked id="home">
-        <House w={3.0} d={2.4} h={2.1} roof={PAL.roofTeal} roofH={1.4} />
-        <M g={cyl(0.05, 0.05, 2.2, 6)} c={PAL.night} p={[-1.9, 1.1, 0.6]} />
-      </Baked>
-      <mesh ref={flag} geometry={flagGeo()} material={mat(PAL.roofGold)} position={[-1.88, 1.95, 0.6]} castShadow receiveShadow />
-      <Smoke origin={chimneyTop(3.0, 2.4, 2.1, 1.4)} count={5} size={0.26} speed={0.2} rise={2.6} />
     </group>
   );
 }

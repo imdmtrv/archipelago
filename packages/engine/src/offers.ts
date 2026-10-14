@@ -8,8 +8,11 @@ export function nextUid(world: WorldState, prefix: string): string {
   return `${prefix}${world.nextUid++}`;
 }
 
-function rollDefId(rng: Rng): string {
-  const kind = rng.weighted(R.DEAL_KIND_WEIGHTS);
+function rollDefId(world: WorldState, rng: Rng): string {
+  let kind = rng.weighted(R.DEAL_KIND_WEIGHTS);
+  if (kind === 'scam' && world.offers.filter((o) => ASSET_DEFS[o.defId].kind === 'scam').length >= R.MAX_SCAMS_ON_BOARD) {
+    kind = rng.weighted({ asset: R.DEAL_KIND_WEIGHTS.asset, status: R.DEAL_KIND_WEIGHTS.status });
+  }
   return rng.weighted(DEAL_WEIGHTS[kind]);
 }
 
@@ -17,7 +20,7 @@ function spread(rng: Rng, base: number, share: number): number {
   return base * rng.range(1 - share, 1 + share);
 }
 
-export function createOffer(world: WorldState, rng: Rng, defId: string = rollDefId(rng)): Offer {
+export function createOffer(world: WorldState, rng: Rng, defId: string = rollDefId(world, rng)): Offer {
   const def = ASSET_DEFS[defId];
   const price = Math.max(10, Math.round(spread(rng, def.price, R.OFFER_PRICE_SPREAD) / 10) * 10);
   const income = def.income > 0 ? Math.max(1, Math.round(spread(rng, def.income, R.OFFER_INCOME_SPREAD))) : 0;

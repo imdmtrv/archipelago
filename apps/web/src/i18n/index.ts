@@ -17,12 +17,9 @@ function storedLang(): Lang | null {
   } catch { return null; }
 }
 
-function browserLang(): Lang {
-  const first = navigator.languages?.[0] ?? navigator.language ?? '';
-  return first.split('-')[0].toLowerCase() === 'ru' ? 'ru' : 'en';
-}
-
-function initialLang(): Lang { return pathForcesEnglish() ? 'en' : storedLang() ?? browserLang(); }
+// Адрес решает язык: `/en/` — английский всегда, корень — русский, если игрок сам не выбрал другой язык.
+// Язык браузера не учитывается: русскоязычные игроки с английским телефоном попадали на английскую версию.
+function initialLang(): Lang { return pathForcesEnglish() ? 'en' : storedLang() ?? 'ru'; }
 
 interface I18nState { lang: Lang; setLang(lang: Lang): void }
 export const useLanguage = create<I18nState>((set, get) => ({
@@ -173,7 +170,8 @@ export function eventCopy(event: GameEvent): { title: string; text: string } {
     case 'fishShoal': return t.events.fishShoal;
     case 'touristBoom': return t.events.touristBoom;
     case 'crisis': return t.events.crisis;
-    case 'scamCollapse': return t.events.scamCollapse;
+    case 'scamCollapse': return p.defId === 'oysterBeds' ? t.events.scamCollapseOysterBeds
+      : p.defId === 'tideFund' ? t.events.scamCollapseTideFund : t.events.scamCollapse;
     case 'emergencyLoan': return { title: t.events.emergencyLoan.title, text: t.events.emergencyLoan.text(coins(Number(p.amount)), Number(p.rate)) };
     case 'freedom': return t.events.freedom;
     case 'dreamStage': {
@@ -214,10 +212,17 @@ export function newsText(item: WeekNewsItem, players: readonly PlayerState[]): s
     case 'loan': return t.news.loan(name, female, coins(item.amount));
     case 'repaid': return t.news.repaid(name, female, coins(item.amount));
     case 'emergency': return t.news.emergency(name, female, coins(item.amount));
-    case 'scam': return t.news.scam(name);
+    case 'scam': return item.defId === 'oysterBeds' ? t.news.scamOysterBeds(name)
+      : item.defId === 'tideFund' ? t.news.scamTideFund(name) : t.news.scam(name);
     case 'freedom': return item.playerId.startsWith('bot-') ? t.news.freedomBot(name, female, item.week) : t.news.freedomHuman(name, item.week);
     case 'dreamDone': return t.news.dreamDone(name);
   }
 }
 
 export function languageLabel(lang: Lang) { return lang.toUpperCase(); }
+
+export function scamWarning(defId: string): string {
+  const { t } = getI18n();
+  return defId === 'oysterBeds' ? t.ui.deals.scamOysterBeds
+    : defId === 'tideFund' ? t.ui.deals.scamTideFund : t.ui.deals.scam;
+}

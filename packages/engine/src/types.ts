@@ -32,6 +32,8 @@ export interface AssetDef {
   resaleRate: number;        // доля цены при продаже (до рыночной поправки)
   /** Только для афер: через сколько недель «ферма» исчезает. */
   collapseWeeks?: [number, number];
+  /** Уровень знаний для распознавания аферы; по умолчанию SCAM_SIGHT_KNOWLEDGE. */
+  scamSightKnowledge?: number;
   /** Улучшения на том же месте: upgrades[0] — переход на уровень 2, upgrades[1] — на уровень 3. */
   upgrades?: UpgradeDef[];
 }
@@ -154,7 +156,7 @@ export type WeekNewsItem =
   | { playerId: string; kind: 'sold'; defId: string; level: number }
   | { playerId: string; kind: 'upgraded'; defId: string; fromLevel: number }
   | { playerId: string; kind: 'loan' | 'repaid' | 'emergency'; amount: number }
-  | { playerId: string; kind: 'scam' }
+  | { playerId: string; kind: 'scam'; defId?: string }
   | { playerId: string; kind: 'freedom'; week: number }
   | { playerId: string; kind: 'dreamDone' }
   | { playerId: string; kind: 'legacy'; legacyText: string };

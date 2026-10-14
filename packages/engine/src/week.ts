@@ -83,9 +83,9 @@ function collapseScams(world: WorldState, reports: Record<string, PlayerWeekRepo
     player.owned = player.owned.filter((a) => !isCollapsing(a, world.week));
     for (const a of lost) {
       reports[player.id].lostAssetUids.push(a.uid);
-      reports[player.id].events.push(scamCollapseEvent(a.uid));
+      reports[player.id].events.push(scamCollapseEvent(a.uid, a.defId));
+      if (player.isBot) news.push(scamNews(player, a.defId));
     }
-    if (player.isBot) news.push(scamNews(player));
   }
 }
 

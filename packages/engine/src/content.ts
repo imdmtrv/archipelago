@@ -1,5 +1,6 @@
 // Контент: все сделки архипелага. Числа — базовые, конкретное предложение отклоняется от них случайно.
 import type { AssetDef, DealKind, DreamDef } from './types';
+import * as R from './rules';
 
 // Улучшения (`upgrades`) стоят дороже самой сделки и окупаются медленнее новой покупки: при рынке 1.0
 // вторая ступень — за 20–24 недели, третья — за 28 (новые сделки — 13–22). Пока на острове есть место,
@@ -89,6 +90,19 @@ export const ASSET_DEFS: Record<string, AssetDef> = {
     price: 800, income: 200, upkeep: 0, sector: 'stable', joy: 0,
     slot: 'sea', model: 'pearlFarm', minKnowledge: 0, stormRisk: 0, resaleRate: 0.2,
     collapseWeeks: [2, 5],
+    scamSightKnowledge: 1,
+  },
+  oysterBeds: {
+    id: 'oysterBeds', kind: 'scam',
+    price: 700, income: 100, upkeep: 5, sector: 'fish', joy: 0,
+    slot: 'sea', model: 'pearlFarm', minKnowledge: 0, stormRisk: 0, resaleRate: 0.2,
+    collapseWeeks: [3, 6], scamSightKnowledge: 1,
+  },
+  tideFund: {
+    id: 'tideFund', kind: 'scam',
+    price: 600, income: 60, upkeep: 0, sector: 'stable', joy: 0,
+    slot: 'finance', model: 'bank', minKnowledge: 0, stormRisk: 0, resaleRate: 0.2,
+    collapseWeeks: [4, 8], scamSightKnowledge: 2,
   },
   fountain: {
     id: 'fountain', kind: 'status',
@@ -116,8 +130,14 @@ export const ASSET_DEFS: Record<string, AssetDef> = {
 export const DEAL_WEIGHTS: Record<DealKind, Record<string, number>> = {
   asset: { boat: 22, smokehouse: 16, cottage: 16, bungalow: 16, cafe: 12, deposit: 10, shares: 8 },
   status: { garden: 35, fountain: 30, statue: 20, yacht: 15 },
-  scam: { pearlFarm: 1 },
+  scam: { pearlFarm: 30, oysterBeds: 40, tideFund: 30 },
 };
+
+/** Видна ли афера при текущих знаниях игрока. */
+export function isScamVisible(defId: string, knowledge: number): boolean {
+  const def = ASSET_DEFS[defId];
+  return def?.kind === 'scam' && knowledge >= (def.scamSightKnowledge ?? R.SCAM_SIGHT_KNOWLEDGE);
+}
 
 /** Мечты. Пока одна — шхуна; выбор мечты на старте появится вместе с профессиями. */
 export const DREAMS: Record<string, DreamDef> = {
