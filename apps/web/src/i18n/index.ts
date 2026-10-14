@@ -17,12 +17,9 @@ function storedLang(): Lang | null {
   } catch { return null; }
 }
 
-function browserLang(): Lang {
-  const first = navigator.languages?.[0] ?? navigator.language ?? '';
-  return first.split('-')[0].toLowerCase() === 'ru' ? 'ru' : 'en';
-}
-
-function initialLang(): Lang { return pathForcesEnglish() ? 'en' : storedLang() ?? browserLang(); }
+// Адрес решает язык: `/en/` — английский всегда, корень — русский, если игрок сам не выбрал другой язык.
+// Язык браузера не учитывается: русскоязычные игроки с английским телефоном попадали на английскую версию.
+function initialLang(): Lang { return pathForcesEnglish() ? 'en' : storedLang() ?? 'ru'; }
 
 interface I18nState { lang: Lang; setLang(lang: Lang): void }
 export const useLanguage = create<I18nState>((set, get) => ({
