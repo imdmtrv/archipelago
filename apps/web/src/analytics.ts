@@ -4,7 +4,7 @@ import { HUMAN, useGame } from './store';
 export type AnalyticsEvent =
   | 'game-start' | 'week-5' | 'week-10' | 'week-20'
   | 'freedom' | 'dream-done' | 'share' | 'feedback-open'
-  | 'coach-done' | 'coach-skip' | 'lang-switch';
+  | 'coach-done' | 'coach-skip' | 'lang-switch' | 'challenge-open' | 'challenge-start';
 
 declare global {
   interface Window {

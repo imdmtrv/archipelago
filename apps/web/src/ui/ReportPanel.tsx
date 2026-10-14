@@ -3,9 +3,10 @@ import { HUMAN, useGame } from '../store';
 import { Meter, Pips } from './common';
 import { lowerFirst, percent } from './text';
 import { levelGenitive, levelTitle, useI18n, weeks } from '../i18n';
+import { ShareButton } from './ShareButton';
 
 /** До свободы шкала 0–100%; после — шкала запаса до последнего уровня, с отметками уровней. */
-export function FreedomBlock() {
+export function FreedomBlock({ compact = false }: { compact?: boolean }) {
   const { t, fmt } = useI18n();
   const world = useGame((s) => s.world)!;
   const fin = financeView(world, HUMAN);
@@ -24,6 +25,7 @@ export function FreedomBlock() {
             ? <>{t.ui.report.covered} <b>{t.ui.report.hold}</b></>
             : <>{t.ui.report.passiveCovers(fmt(fin.passiveIncome), fmt(fin.expenses.total))}</>}
         </div>
+        {!compact && world.week >= 5 && <ShareButton challenge className="btn ghost challenge-button" />}
       </div>
     );
   }
@@ -69,6 +71,7 @@ export function FreedomBlock() {
           {t.ui.report.employedShortfall}
         </div>
       )}
+      {!compact && world.week >= 5 && <ShareButton challenge className="btn ghost challenge-button" />}
     </div>
   );
 }

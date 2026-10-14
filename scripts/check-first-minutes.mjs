@@ -155,25 +155,36 @@ try {
   await noAsset.close();
 
   const shared = await browser.newPage({ locale: 'ru-RU' });
-  await shared.addInitScript(() => Object.defineProperty(navigator, 'share', { configurable: true, value: (data) => { window.__shared = data; return Promise.resolve(); } }));
+  await shared.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: (data) => { window.__shared = data; return Promise.resolve(); } });
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+  });
+  // «Поделиться» сначала рисует картинку, поэтому ждём вызова navigator.share
+  const sharedData = async () => {
+    await shared.waitForFunction(() => window.__shared);
+    return shared.evaluate(() => { const d = window.__shared; window.__shared = null; return { title: d.title, text: d.text, url: d.url, files: (d.files || []).map((f) => f.type) }; });
+  };
   await shared.goto(url); await shared.evaluate(() => localStorage.setItem('archipelago.coach.v1', 'done')); await shared.reload();
   if (!await shared.locator('.hud').count()) await shared.getByRole('button', { name: 'Начать игру', exact: true }).click();
   await shared.evaluate(async () => {
     const { useGame } = await import('/src/store.ts');
     const world = structuredClone(useGame.getState().world); world.players[0].freedomWeek = 21;
     const mine = { playerId:'p1', salary:120, assetIncome:[], upkeep:[], living:80, interest:0, insurance:0, eventsCash:0, net:40, cashAfter:700, happinessDelta:0, events:[], lostAssetUids:[], freedomReached:true };
+    // Вызов записывает путь по сыгранным неделям — мир должен выглядеть как после 21-й недели
+    world.week = 22; world.lastReport = { week:21, worldEvents:[], players:{p1:mine}, news:[] };
     useGame.setState({ world, modal: { report:{ week:21, worldEvents:[], players:{p1:mine}, news:[] }, events:[], freedom:true, epilogue:false } });
   });
   await shared.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
-  let data = await shared.evaluate(() => window.__shared);
-  assert.equal(data.title, 'Архипелаг'); assert.match(data.text, /21 неделю/); assert.match(data.url, /\?ref=share$/);
+  let data = await sharedData();
+  assert.equal(data.title, 'Архипелаг'); assert.match(data.text, /21 неделю/); assert.match(data.url, /\?c=[\w-]+$/);
+  assert.deepEqual(data.files, ['image/png']);
   await shared.evaluate(async () => {
     const { useGame } = await import('/src/store.ts'); const state = useGame.getState(); const world = structuredClone(state.world);
     world.players[0].dream.doneWeek = 37; world.players[0].dream.built = 3;
     useGame.setState({ world, modal: { ...state.modal, epilogue:true } });
   });
   await shared.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
-  data = await shared.evaluate(() => window.__shared); assert.match(data.text, /21 неделю/); assert.match(data.text, /37 недель/);
+  data = await sharedData(); assert.match(data.text, /21 неделю/); assert.match(data.text, /37 недель/);
   await shared.close();
 
   const clip = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'], locale: 'ru-RU' });
@@ -184,11 +195,13 @@ try {
   await clipPage.evaluate(async () => {
     const { useGame } = await import('/src/store.ts'); const world = structuredClone(useGame.getState().world); world.players[0].freedomWeek = 23;
     const mine={playerId:'p1',salary:0,assetIncome:[],upkeep:[],living:80,interest:0,insurance:0,eventsCash:0,net:0,cashAfter:600,happinessDelta:0,events:[],lostAssetUids:[],freedomReached:true};
+    world.week = 24; world.lastReport = { week:23, worldEvents:[], players:{p1:mine}, news:[] };
     useGame.setState({world,modal:{report:{week:23,worldEvents:[],players:{p1:mine},news:[]},events:[],freedom:true,epilogue:false}});
   });
   await clipPage.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
-  assert.match(await clipPage.evaluate(() => navigator.clipboard.readText()), /Архипелаг: финансовая свобода за 23 недели.*ref=share/);
-  await clipPage.getByText('Скопировано — вставьте в сообщение или пост', { exact: true }).waitFor();
+  // Без системного «Поделиться»: картинка скачивается, текст со ссылкой-вызовом копируется
+  await clipPage.getByText('Картинка скачана, ссылка скопирована — отправьте их другу', { exact: true }).waitFor();
+  assert.match(await clipPage.evaluate(() => navigator.clipboard.readText()), /Архипелаг: финансовая свобода за 23 недели[\s\S]*\?c=[\w-]+$/);
   await clip.close();
 
   const analytics = await browser.newPage({ locale: 'ru-RU' });

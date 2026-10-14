@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { GOALS, type EngineError, type GameEvent, type GoalReward, type PlayerState, type RumorView, type Sector, type SlotType, type WeekNewsItem } from '@arch/engine';
 import { ru, type Dict } from './ru';
 import { en } from './en';
+import type { ChallengeData, Moment } from '../challenge';
 
 export type Lang = 'ru' | 'en';
 const KEY = 'archipelago.lang.v1';
@@ -105,6 +106,35 @@ export function weeksAcc(n: number): string {
   const { t, plural } = getI18n();
   const word = plural(n, t.units.weekAcc);
   return `${n} ${word}`;
+}
+
+/** Имя автора произвольное: не склоняем его и не угадываем пол. */
+export function challengeResult(data: ChallengeData): string {
+  const { t } = getI18n();
+  const result = data.freedomWeek !== null ? t.ui.challenge.freedom(weeksAcc(data.freedomWeek))
+    : t.ui.challenge.progress(data.progress.at(-1) ?? 0, weeksAcc(data.week));
+  return `${t.ui.challenge.result(data.name, result, data.island)} ${data.freedomWeek === null ? t.ui.challenge.catchUp : t.ui.challenge.invite}`;
+}
+
+export function challengeComparison(week: number, data: ChallengeData, card = false): string {
+  const { t } = getI18n();
+  if (data.freedomWeek === null) return t.ui.challenge.unfinished(data.name);
+  const diff = data.freedomWeek - week;
+  if (card) return diff === 0 ? t.ui.challenge.cardSame(data.name) : t.ui.challenge.cardComparison(data.name, weeks(Math.abs(diff)), diff > 0);
+  const outcome = diff === 0 ? t.ui.challenge.same : diff > 0 ? t.ui.challenge.fasterBy(weeks(Math.abs(diff))) : t.ui.challenge.slowerBy(weeks(Math.abs(diff)));
+  return t.ui.challenge.comparison(weeks(week), data.name, weeks(data.freedomWeek), outcome);
+}
+
+export function momentText(moment: Moment): string {
+  const { t } = getI18n();
+  switch (moment.kind) {
+    case 'bought': return t.ui.challenge.bought(assetCopy(moment.defId!).title);
+    case 'upgraded': return t.ui.challenge.upgraded(assetCopy(moment.defId!, moment.level).title);
+    case 'freedom': return t.ui.challenge.momentFreedom;
+    case 'freedomLevel': return t.ui.challenge.level(levelTitle(moment.level!));
+    case 'dreamStage': return t.ui.challenge.stage(dreamCopy(moment.level! - 1).title);
+    case 'dreamDone': return t.ui.challenge.dreamDone;
+  }
 }
 
 export function days(n: number): string {

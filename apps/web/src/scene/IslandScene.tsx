@@ -1,8 +1,8 @@
 // 3D-сцена острова — реализация контракта IslandSceneProps (см. contract.ts).
 // Полноэкранный Canvas (position: fixed, z-index 0) + DOM-слои: tilt-shift, виньетка, всплывающие суммы.
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { NeutralToneMapping } from 'three';
+import { Canvas, useThree } from '@react-three/fiber';
+import { NeutralToneMapping, PerspectiveCamera, Vector2 } from 'three';
 import type { IslandSceneProps } from './contract';
 import { BusContext, createBus } from './bus';
 import { CAM_DIR, TARGET, idealDistance } from './layout';
@@ -19,8 +19,37 @@ import { CameraRig, type CameraFocus } from './CameraRig';
 import { DirectorCamera } from './DirectorCamera';
 import { dreamFocusPoint } from './slots';
 import './scene.css';
+import { registerIslandCapture } from './snapshot';
 
 const GL = { antialias: true, toneMapping: NeutralToneMapping, toneMappingExposure: 1.05 };
+
+function SnapshotCapture() {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => registerIslandCapture(() => {
+    if (gl.getContext().isContextLost()) throw new Error('WebGL context lost');
+    const size = gl.getSize(new Vector2()), pixelRatio = gl.getPixelRatio();
+    // Тот же остров и ракурс, но без сдвига под шторку и боковые панели.
+    const shot = camera.clone() as PerspectiveCamera;
+    shot.aspect = 1080 / 800; shot.zoom = 1; shot.clearViewOffset();
+    shot.position.sub(TARGET).normalize().multiplyScalar(idealDistance(shot.aspect)).add(TARGET);
+    shot.lookAt(TARGET); shot.updateProjectionMatrix();
+    try {
+      gl.setPixelRatio(1); gl.setSize(1080, 800, false);
+      gl.render(scene, shot);
+      const frame = document.createElement('canvas');
+      frame.width = 1080; frame.height = 800;
+      const ctx = frame.getContext('2d');
+      if (!ctx) throw new Error('Canvas unavailable');
+      ctx.drawImage(gl.domElement, 0, 0);
+      ctx.getImageData(0, 0, 1, 1); // недоступный для экспорта кадр → градиент карточки
+      return frame;
+    } finally {
+      gl.setPixelRatio(pixelRatio); gl.setSize(size.x, size.y, false);
+      gl.render(scene, camera);
+    }
+  }), [gl, scene, camera]);
+  return null;
+}
 
 export function IslandScene({ items, floats, weather, dream, bottomInset = 0, sideInsets, cameraPose, dpr, onItemClick }: IslandSceneProps) {
   const storm = weather === 'storm';
@@ -56,6 +85,7 @@ export function IslandScene({ items, floats, weather, dream, bottomInset = 0, si
       style={{ '--isl-inset': Math.min(0.6, Math.max(0, bottomInset || 0)) } as CSSProperties}
     >
       <Canvas shadows="percentage" dpr={dpr ?? [1, 2]} gl={GL} camera={camera}>
+        <SnapshotCapture />
         <BusContext.Provider value={bus}>
           <Atmosphere />
           <Water segments={small ? 170 : 230} />
