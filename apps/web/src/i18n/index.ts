@@ -162,7 +162,7 @@ export function rumorWhen(rumor: Pick<RumorView, 'fromWeek' | 'toWeek' | 'exactW
 }
 
 export function goalCopy(id: string) {
-  return getI18n().t.ui.goals.items[id as keyof typeof ru.ui.goals.items] ?? { title: id, text: '' };
+  return getI18n().t.ui.goals.items[id as keyof typeof ru.ui.goals.items] ?? { title: id, text: '', done: id };
 }
 
 export function goalRewardText(reward: GoalReward): string {
@@ -177,14 +177,20 @@ export function eventCopy(event: GameEvent, players: readonly PlayerState[] = []
   switch (event.id) {
     case 'rumor': {
       const kind = String(p.kind) as RumorView['kind'];
-      const text = t.events.rumor[kind];
+      const source = p.source === 'gossip' ? 'gossip' : 'reliable';
+      const text = t.events.rumor[source][kind];
       const when = rumorWhen({ fromWeek: Number(p.fromWeek), toWeek: Number(p.toWeek), exactWeek: p.exactWeek === undefined ? null : Number(p.exactWeek) }, currentWeek);
       return { title: t.events.rumor.title, text: text ? text(when) : '' };
+    }
+    case 'rumorFalse': {
+      const kind = String(p.kind) as RumorView['kind'];
+      return { title: t.events.rumorFalse.title, text: t.events.rumorFalse.text(t.ui.rumors.kinds[kind] ?? String(p.kind)) };
     }
     case 'goalDone': {
       const id = String(p.goalId);
       const reward = GOALS.find((goal) => goal.id === id)?.reward ?? { cash: event.cashDelta ?? 0, joy: 0 };
-      return { title: t.events.goalDone.title(goalCopy(id).title), text: t.events.goalDone.text(goalRewardText(reward)) };
+      const goal = goalCopy(id);
+      return { title: t.events.goalDone.title(goal.title), text: t.events.goalDone.text(goal.done, goalRewardText(reward)) };
     }
     case 'neighborLoanReturned':
     case 'neighborLoanLate':

@@ -622,3 +622,9 @@ button, input { font: inherit; color: inherit; }
 @media (min-width: 1024px) {
   .col-left > .panel.scroll { flex: 0 0 auto; overflow: visible; }
 }
+
+/* ───────── Источники слухов ───────── */
+.rumor-chip { border: 1px solid transparent; }
+.rumor-chip.gossip { border-color: currentColor; border-style: dashed; font-weight: 700; }
+.rumor-chip.gossip.pos { background: rgba(35, 147, 94, 0.06); }
+.rumor-chip.gossip.neg { background: rgba(220, 75, 67, 0.06); }

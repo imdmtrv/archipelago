@@ -1,5 +1,5 @@
 // Развилки и займы соседям: результат зависит от их настоящих наличных.
-import { clamp, getDef } from './economy';
+import { clamp, freeSlotIndex, getDef } from './economy';
 import { nextUid } from './offers';
 import { Rng } from './rng';
 import * as R from './rules';
@@ -16,16 +16,26 @@ export function generateChoice(world: WorldState, player: PlayerState, rng: Rng)
   const neighbor = bots.find((p) => p.loans.some((l) => l.emergency)) ?? [...bots].sort((a, b) => a.cash - b.cash)[0];
   const amount = Math.round(rng.range(...R.NEIGHBOR_LOAN_ASK) / 10) * 10;
   const assets = player.owned.filter((a) => buyerAsset(player, a.uid));
+  const sellers = bots.filter((p) => p.loans.some((l) => l.emergency) || p.cash < R.FIRE_SALE_TROUBLE_CASH)
+    .map((p) => ({ player: p, assets: p.owned.filter((a) => buyerAsset(p, a.uid)) }))
+    .filter((s) => s.assets.length)
+    .sort((a, b) => Number(b.player.loans.some((l) => l.emergency)) - Number(a.player.loans.some((l) => l.emergency))
+      || a.player.cash - b.player.cash);
+  const seller = sellers[0];
+  const saleAsset = seller?.assets[rng.int(0, seller.assets.length - 1)];
   const weights: Partial<Record<ChoiceKind, number>> = {};
   if (neighbor && player.cash >= amount + 50) weights.neighborLoan = R.CHOICE_WEIGHTS.neighborLoan;
-  if (player.employed && player.promotions < R.PROMOTION_MAX) weights.promotion = R.CHOICE_WEIGHTS.promotion;
+  if (saleAsset && freeSlotIndex(player, getDef(saleAsset.defId).slot) !== null) weights.fireSale = R.CHOICE_WEIGHTS.fireSale;
   if (assets.length) weights.buyer = R.CHOICE_WEIGHTS.buyer;
   if (!Object.keys(weights).length) return;
   const kind = rng.weighted(weights as Record<ChoiceKind, number>);
   let params;
   if (kind === 'neighborLoan') params = { neighborId: neighbor!.id, amount };
-  else if (kind === 'promotion') params = { salary: R.PROMOTION_SALARY, living: R.PROMOTION_LIVING };
-  else {
+  else if (kind === 'fireSale') {
+    const asset = saleAsset!;
+    params = { neighborId: seller.player.id, assetUid: asset.uid,
+      price: Math.round(asset.price * rng.range(...R.FIRE_SALE_DISCOUNT) / 10) * 10 };
+  } else {
     const asset = assets[rng.int(0, assets.length - 1)];
     params = { assetUid: asset.uid, offer: Math.round(asset.price * rng.range(...R.BUYER_PREMIUM) / 10) * 10 };
   }
@@ -47,12 +57,19 @@ export function resolvePendingChoice(world: WorldState, player: PlayerState, acc
     player.lent.push({ uid: choice.uid, neighborId: neighbor.id, amount, dueWeek: world.week + rng.int(...R.NEIGHBOR_LOAN_DUE), tries: 0 });
     world.rng = rng.state;
     player.happiness = clamp(player.happiness + R.NEIGHBOR_LOAN_JOY, 0, 100);
-  } else if (choice.kind === 'promotion') {
-    if (!player.employed || player.promotions >= R.PROMOTION_MAX) { player.choice = null; return { code: 'noChoice' }; }
-    player.salary += Number(choice.params.salary);
-    player.living += Number(choice.params.living);
-    player.happiness = clamp(player.happiness + R.PROMOTION_JOY, 0, 100);
-    player.promotions++;
+  } else if (choice.kind === 'fireSale') {
+    const neighbor = world.players.find((p) => p.id === choice.params.neighborId);
+    const asset = neighbor && buyerAsset(neighbor, choice.params.assetUid);
+    if (!asset) { player.choice = null; return { code: 'noSuchAsset' }; }
+    const slot = getDef(asset.defId).slot;
+    const slotIndex = freeSlotIndex(player, slot);
+    if (slotIndex === null) return { code: 'slotFull', slot };
+    const price = Number(choice.params.price);
+    if (player.cash < price) return { code: 'notEnoughCash', missing: price - player.cash };
+    player.cash -= price;
+    neighbor.cash += price;
+    neighbor.owned = neighbor.owned.filter((a) => a.uid !== asset.uid);
+    player.owned.push({ ...asset, slotIndex, price, boughtWeek: world.week });
   } else {
     const asset = buyerAsset(player, choice.params.assetUid);
     if (!asset) { player.choice = null; return { code: 'noSuchAsset' }; }

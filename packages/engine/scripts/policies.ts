@@ -25,7 +25,7 @@ export interface SensibleOptions {
   /** true — никогда не покупать известные движку аферы, даже без знания игрока. */
   avoidScams?: boolean;
   /** Сравнение уроков развилок и слухов на тех же сидах. */
-  alwaysPromote?: boolean;
+  fireSales?: boolean;
   lendEveryone?: boolean;
   listenRumors?: boolean;
 }
@@ -48,7 +48,7 @@ function sensibleUpgrade(world: WorldState, me: PlayerState, buffer: number): Pl
 /** Разумный игрок симулятора: сначала решает развилку, затем ведёт хозяйство. */
 export function makeSensible({
   beforeBuying, upgradeReserve, upgrades = true, study = true, avoidScams = false,
-  alwaysPromote = false, lendEveryone = false, listenRumors = false,
+  fireSales = true, lendEveryone = false, listenRumors = false,
 }: SensibleOptions = {}): Policy {
   return (world, me) => {
     if (me.choice) {
@@ -58,7 +58,8 @@ export function makeSensible({
         const neighbor = world.players.find((p) => p.id === view.neighborId)!;
         accept = view.canAccept && (lendEveryone || (!neighbor.loans.some((l) => l.emergency)
           && financeView(world, neighbor.id).net > 0 && me.cash - view.amount >= 150));
-      } else if (view?.kind === 'promotion') accept = alwaysPromote;
+      } else if (view?.kind === 'fireSale') accept = fireSales && view.canAccept
+        && view.paybackWeeks !== null && view.paybackWeeks <= 30 && me.cash - view.price >= 80;
       else if (view?.kind === 'buyer') accept = view.offer >= 25 * view.weeklyIncome;
       return { type: 'resolveChoice', playerId: me.id, accept };
     }
@@ -81,7 +82,7 @@ export function makeSensible({
     if (extra) return extra;
 
     const views = offerViews(world, me.id);
-    const rumors = listenRumors ? rumorViews(world, me.id) : [];
+    const rumors = listenRumors ? rumorViews(world, me.id).filter((r) => r.source === 'reliable') : [];
     const crisis = rumors.some((r) => r.kind === 'crisis');
     const preferred = new Set(rumors.flatMap((r) => r.kind === 'fishShoal' ? ['fish'] : r.kind === 'touristBoom' ? ['tourism'] : []));
     const best = views
@@ -113,10 +114,10 @@ const grinder: Policy = (world, me) => {
   return action && action.type !== 'rest' ? action : null;
 };
 
-export const ENGAGEMENT_LABELS = { promote: 'Переезжает всегда', lend: 'Одалживает всем', rumors: 'Слушает слухи' };
+export const ENGAGEMENT_LABELS = { noFireSales: 'Не покупает на распродажах', lend: 'Одалживает всем', rumors: 'Слушает слухи' };
 export const HUMAN_POLICIES: Record<string, Policy> = {
   sensible, 'no-upgrades': noUpgrades, idle, grinder,
-  [ENGAGEMENT_LABELS.promote]: makeSensible({ alwaysPromote: true }),
+  [ENGAGEMENT_LABELS.noFireSales]: makeSensible({ fireSales: false }),
   [ENGAGEMENT_LABELS.lend]: makeSensible({ lendEveryone: true }),
   [ENGAGEMENT_LABELS.rumors]: makeSensible({ listenRumors: true }),
 };

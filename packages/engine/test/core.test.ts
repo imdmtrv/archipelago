@@ -18,7 +18,7 @@ describe('createWorld', () => {
   it('создаёт человека и трёх ботов, неделя 1, полная доска', () => {
     const world = newWorld(7);
     expect(world.week).toBe(1);
-    expect(world.version).toBe(5);
+    expect(world.version).toBe(6);
     expect(world.players.map((p) => p.id)).toEqual(['p1', 'bot-mia', 'bot-timur', 'bot-boris']);
     expect(world.players[0]).toMatchObject({ name: 'Аня', islandName: 'Чайка', isBot: false, cash: 600, happiness: 70 });
     // Второй акт: все на работе, мечта только у человека.

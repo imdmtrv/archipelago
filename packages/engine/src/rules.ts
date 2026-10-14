@@ -26,7 +26,7 @@ export const INCOME_BONUS_KNOWLEDGE = 3;
 export const INCOME_BONUS = 0.1;            // +10% к доходу активов
 
 // ───────────── Кредиты ─────────────
-export const LOAN_RATE = 0.015;             // обычный кредит, в неделю
+export const LOAN_RATE = 0.017;             // обычный кредит, в неделю
 export const EMERGENCY_RATE = 0.04;         // ростовщик, в неделю
 export const LOAN_LIMIT_SALARY_WEEKS = 3;   // лимит = 3 × зарплата + …
 export const LOAN_LIMIT_ASSET_SHARE = 0.3;  // … + 30% стоимости продажи имущества − долги
