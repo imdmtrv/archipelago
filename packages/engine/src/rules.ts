@@ -107,6 +107,7 @@ export const NEIGHBOR_LOAN_DUE: [number, number] = [4, 8];     // через с�
 export const NEIGHBOR_LOAN_RETRY = 2;       // не смог — пробует снова через 2 недели…
 export const NEIGHBOR_LOAN_TRIES = 3;       // …всего 3 попытки, потом долг пропадает
 export const NEIGHBOR_LOAN_JOY = 4;         // помочь соседу приятно
+export const NEIGHBOR_ASK_AFTER_DECLINE = 20; // после отказа сосед не просит столько недель
 export const FIRE_SALE_DISCOUNT: [number, number] = [0.6, 0.75]; // сосед в беде отдаёт актив за 60–75% своей цены
 export const FIRE_SALE_TROUBLE_CASH = 150;  // «в беде» — заём у ростовщика или наличных меньше этого
 export const BUYER_PREMIUM: [number, number] = [1.2, 1.45]; // покупатель предлагает 120–145% уплаченной цены

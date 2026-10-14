@@ -1,6 +1,6 @@
 // Подсчёт итогов недели (шаги 2–8 из endWeek). Работает на уже скопированном мире.
 import { addLoan, returnToJob } from './actions';
-import { generateChoice, settleLent } from './choices';
+import { generateChoice, resolvePendingChoice, settleLent } from './choices';
 import { insuranceActive } from './engagement';
 import { settleGoals } from './goals';
 import {
@@ -200,7 +200,7 @@ export function settleWeek(world: WorldState, news: NewsItem[]): WorldState {
   const endedWeek = world.week;
   const snapshot = snapshotMarket(world.market);
   for (const player of world.players) {
-    if (player.choice && player.choice.week <= endedWeek) player.choice = null;
+    if (player.choice && player.choice.week <= endedWeek) resolvePendingChoice(world, player, false);
   }
 
   const reports: Record<string, PlayerWeekReport> = {};

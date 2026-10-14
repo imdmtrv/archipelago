@@ -52,6 +52,7 @@ function newPlayer(id: string, name: string, islandName: string, profession: Pro
     choice: null,
     lastChoiceWeek: 0,
     lent: [],
+    noAskUntil: {},
     // Цели — тоже только у человека.
     goals: botStyle ? null : newGoalsState(),
   };
@@ -61,7 +62,7 @@ function newPlayer(id: string, name: string, islandName: string, profession: Pro
 
 export function createWorld(opts: { seed: number; playerName: string; islandName: string; profession?: ProfessionId }): WorldState {
   const world: WorldState = {
-    version: 7,
+    version: 8,
     seed: opts.seed,
     rng: opts.seed >>> 0,
     nextUid: 1,

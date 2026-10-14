@@ -191,6 +191,7 @@ export interface PlayerState {
   choice: PendingChoice | null; // нерешённая развилка; у ботов всегда null
   lastChoiceWeek: number;    // неделя последней развилки (0 — ещё не было)
   lent: LentLoan[];          // одолжено соседям
+  noAskUntil: Record<string, number>; // до этой недели сосед не просит; 1000000 — никогда
   goals: GoalsState | null;  // у ботов null
 }
 
@@ -264,7 +265,7 @@ export interface WeekReport {
 }
 
 export interface WorldState {
-  version: 7;
+  version: 8;
   seed: number;
   rng: number;               // текущее состояние ГПСЧ — вся случайность только через него
   nextUid: number;

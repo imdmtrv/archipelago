@@ -136,7 +136,7 @@ describe('сокращение', () => {
   });
 });
 
-describe('миграция v6 → v7', () => {
+describe('миграция v6 → v8', () => {
   it('назначает профессии и очищает сокращение, сохраняя финансы и исходный мир', () => {
     const raw = JSON.parse(JSON.stringify(createWorld({ seed: 17, playerName: 'Аня', islandName: 'Чайка', profession: 'doctor' })));
     raw.version = 6;
@@ -149,7 +149,7 @@ describe('миграция v6 → v7', () => {
     }
     const before = structuredClone(raw);
     const migrated = migrateWorld(raw)!;
-    expect(migrated.version).toBe(7);
+    expect(migrated.version).toBe(8);
     expect(migrated.players.map((p) => p.profession)).toEqual(['teacher', 'teacher', 'teacher', 'teacher']);
     for (const [i, p] of migrated.players.entries()) {
       expect(p).toMatchObject({ salary: raw.players[i].salary, living: raw.players[i].living,
@@ -160,7 +160,7 @@ describe('миграция v6 → v7', () => {
     expect(applyAction(migrated, { type: 'endWeek' }).error).toBeUndefined();
   });
 
-  it('v7 сохраняет профессию и сокращение, отклоняет неверные поля', () => {
+  it('v8 сохраняет профессию и сокращение, отклоняет неверные поля', () => {
     const world = createWorld({ seed: 17, playerName: 'Аня', islandName: 'Чайка', profession: 'doctor' });
     player(world).layoffWeeks = 2;
     player(world).lastLayoffWeek = 1;

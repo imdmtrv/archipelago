@@ -267,6 +267,74 @@ describe('развилки', () => {
     expect(me.choice).toBeNull();
   });
 
+  it('отказ блокирует соседа на 20 недель, затем он снова может просить', () => {
+    const world = newWorld();
+    world.players = world.players.filter((p) => !p.isBot || p.id === 'bot-mia');
+    world.week = 4;
+    generateChoice(world, player(world), new ChoiceRng());
+    const after = resolve(world, false).world;
+    expect(player(after)).toEqual({ ...player(world), choice: null, noAskUntil: { 'bot-mia': 24 } });
+    expect(player(world).noAskUntil).toEqual({});
+    for (let week = 4; week < 24; week++) {
+      after.week = week;
+      player(after).lastChoiceWeek = 0;
+      generateChoice(after, player(after), new ChoiceRng());
+      expect(player(after).choice).toBeNull();
+    }
+    after.week = 24;
+    generateChoice(after, player(after), new ChoiceRng());
+    expect(player(after).choice).toMatchObject({ kind: 'neighborLoan', params: { neighborId: 'bot-mia' } });
+  });
+
+  it('текущий долг блокирует просьбу даже после срока возврата; возвращённый — не блокирует', () => {
+    const world = newWorld();
+    world.players = world.players.filter((p) => !p.isBot || p.id === 'bot-mia');
+    world.week = 4;
+    const me = player(world);
+    me.lent = [{ uid: 'l', neighborId: 'bot-mia', amount: 200, dueWeek: 1, tries: 0 }];
+    generateChoice(world, me, new ChoiceRng());
+    expect(me.choice).toBeNull();
+    player(world, 'bot-mia').cash = 400;
+    settleLent(world, reports(world));
+    generateChoice(world, me, new ChoiceRng());
+    expect(me.choice).toMatchObject({ kind: 'neighborLoan', params: { neighborId: 'bot-mia' } });
+  });
+
+  it.each(['lent', 'decline', 'lost'])('при блокировке беднейшего должника (%s) просит другой сосед', (block) => {
+    const world = newWorld();
+    world.week = 4;
+    const me = player(world);
+    player(world, 'bot-boris').cash = 10;
+    player(world, 'bot-mia').cash = 20;
+    player(world, 'bot-timur').cash = 30;
+    player(world, 'bot-boris').loans = [{ uid: 'l', principal: 100, weeklyRate: R.EMERGENCY_RATE, emergency: true }];
+    if (block === 'lent') me.lent = [{ uid: 'l', neighborId: 'bot-boris', amount: 200, dueWeek: 8, tries: 0 }];
+    else me.noAskUntil['bot-boris'] = block === 'decline' ? 24 : 1000000;
+    generateChoice(world, me, new ChoiceRng());
+    expect(me.choice!.params.neighborId).toBe('bot-mia');
+    me.choice = null;
+    me.lastChoiceWeek = 0;
+    player(world, 'bot-timur').loans = [{ uid: 'l2', principal: 100, weeklyRate: R.EMERGENCY_RATE, emergency: true }];
+    generateChoice(world, me, new ChoiceRng());
+    expect(me.choice!.params.neighborId).toBe('bot-timur');
+  });
+
+  it('если все соседи заблокированы, заём недоступен, остальные развилки доступны', () => {
+    const world = newWorld();
+    world.week = 4;
+    const me = player(world);
+    for (const bot of world.players.filter((p) => p.isBot)) me.noAskUntil[bot.id] = 24;
+    generateChoice(world, me, new ChoiceRng());
+    expect(me.choice).toBeNull();
+    expect(me.lastChoiceWeek).toBe(0);
+    giveAsset(world, 'p1', 'boat');
+    const rng = new ChoiceRng();
+    const weighted = vi.spyOn(rng, 'weighted');
+    generateChoice(world, me, rng);
+    expect(weighted).toHaveBeenCalledWith({ buyer: R.CHOICE_WEIGHTS.buyer });
+    expect(me.choice!.kind).toBe('buyer');
+  });
+
   it('выдаёт деньги соседу, счастье человеку и срок возврата; нехватка сохраняет развилку', () => {
     const world = newWorld();
     pending(world, 'neighborLoan', { neighborId: 'bot-mia', amount: 200 });
@@ -329,6 +397,24 @@ describe('развилки', () => {
     vi.spyOn(Rng.prototype, 'chance').mockReturnValue(false);
     settleWeek(world, []);
     expect(player(world)).toMatchObject({ choice: null, salary: R.SALARY, living: R.LIVING });
+  });
+
+  it('нерешённый соседский заём снимается как отказ и блокирует просьбы на 20 недель', () => {
+    const world = newWorld();
+    world.week = 5;
+    pending(world, 'neighborLoan', { neighborId: 'bot-mia', amount: 200 });
+    const chance = vi.spyOn(Rng.prototype, 'chance').mockReturnValue(false);
+    settleWeek(world, []);
+    expect(player(world)).toMatchObject({ choice: null, noAskUntil: { 'bot-mia': 25 }, lent: [] });
+    expect(world.lastReport!.players.p1.events.some((e) => e.id.startsWith('neighborLoan'))).toBe(false);
+    chance.mockRestore();
+    world.players = world.players.filter((p) => !p.isBot || p.id === 'bot-mia');
+    world.week = 24;
+    generateChoice(world, player(world), new ChoiceRng());
+    expect(player(world).choice).toBeNull();
+    world.week = 25;
+    generateChoice(world, player(world), new ChoiceRng());
+    expect(player(world).choice!.params.neighborId).toBe('bot-mia');
   });
 });
 
@@ -477,6 +563,14 @@ describe('возврат соседского займа', () => {
     }
     expect(player(world).cash).toBe(R.START_CASH);
     expect(player(world).lent).toEqual([]);
+    expect(player(world).noAskUntil).toEqual({ 'bot-mia': 1000000 });
+    world.players = world.players.filter((p) => !p.isBot || p.id === 'bot-mia');
+    player(world, 'bot-mia').loans = [{ uid: 'l', principal: 100, weeklyRate: R.EMERGENCY_RATE, emergency: true }];
+    for (const week of [world.week, world.week + 20, 1000000, 1000001]) {
+      world.week = week;
+      generateChoice(world, player(world), new ChoiceRng());
+      expect(player(world).choice).toBeNull();
+    }
     const recover = loanWorld(0);
     settleLent(recover, reports(recover));
     recover.week = 3;
@@ -615,7 +709,7 @@ describe('цели', () => {
   });
 });
 
-describe('миграция старых версий → v7', () => {
+describe('миграция старых версий → v8', () => {
   it('добавляет поля, сохраняет действующую страховку, вход не меняет', () => {
     const world = newWorld();
     player(world).insured = true;
@@ -627,7 +721,7 @@ describe('миграция старых версий → v7', () => {
     const before = JSON.stringify(raw);
     const migrated = migrateWorld(raw)!;
     expect(JSON.stringify(raw)).toBe(before);
-    expect(migrated).toMatchObject({ version: 7, upcoming: [] });
+    expect(migrated).toMatchObject({ version: 8, upcoming: [] });
     expect(player(migrated)).toMatchObject({ insuranceFrom: 12, choice: null, lastChoiceWeek: 0, lent: [], goals: { active: ['study', 'cushion', 'sectors'] } });
     expect(player(migrated)).not.toHaveProperty('promotions');
     expect(insuranceActive(player(migrated), 12)).toBe(true);
@@ -635,7 +729,7 @@ describe('миграция старых версий → v7', () => {
     expect(migrateWorld(migrated)).toEqual(migrated);
   });
 
-  it('v7 сохраняет текущие слухи, развилки и цели; неполный v7 отвергается', () => {
+  it('v8 сохраняет текущие слухи, развилки и цели; неполный v8 отвергается', () => {
     const world = soloWorld();
     world.upcoming = [{ kind: 'storm', week: 4, windowStart: 3, announcedWeek: 1, real: true, source: 'reliable' }];
     pending(world, 'fireSale', { neighborId: 'bot-mia', assetUid: 'missing', price: 200 });
@@ -648,7 +742,7 @@ describe('миграция старых версий → v7', () => {
     expect(migrateWorld(badGoals)).toBeNull();
   });
 
-  it.each(['promotion', 'neighborLoan', 'buyer'])('v5 → v7: слухи настоящие и надёжные, развилка %s', (kind) => {
+  it.each(['promotion', 'neighborLoan', 'buyer'])('v5 → v8: слухи настоящие и надёжные, развилка %s', (kind) => {
     const raw = JSON.parse(JSON.stringify(newWorld()));
     raw.version = 5;
     raw.upcoming = [{ kind: 'storm', week: 4, windowStart: 3, announcedWeek: 1 }];
@@ -659,7 +753,7 @@ describe('миграция старых версий → v7', () => {
     const before = structuredClone(raw);
     const migrated = migrateWorld(raw)!;
     expect(raw).toEqual(before);
-    expect(migrated.version).toBe(7);
+    expect(migrated.version).toBe(8);
     expect(migrated.upcoming).toEqual([{ ...raw.upcoming[0], real: true, source: 'reliable' }]);
     expect(migrated.players.every((p) => !('promotions' in p))).toBe(true);
     expect(player(migrated).choice).toEqual(kind === 'promotion' ? null : raw.players[0].choice);
@@ -669,13 +763,41 @@ describe('миграция старых версий → v7', () => {
     expect(migrateWorld(raw)).toBeNull();
   });
 
-  it('v7 проверяет источник и правду слуха, сохраняет ложный слух', () => {
+  it('v8 проверяет источник и правду слуха, сохраняет ложный слух', () => {
     const world = soloWorld();
     world.upcoming = [{ kind: 'crisis', week: 4, windowStart: 3, announcedWeek: 1, real: false, source: 'gossip' }];
     expect(migrateWorld(world)).toEqual(world);
     for (const [key, value] of [['real', undefined], ['real', 1], ['source', undefined], ['source', 'unknown']] as const) {
       const bad = JSON.parse(JSON.stringify(world));
       bad.upcoming[0][key] = value;
+      expect(migrateWorld(bad)).toBeNull();
+    }
+  });
+
+  it('v7 → v8 добавляет пустой noAskUntil всем, сохраняет займы и развилки, вход не меняет', () => {
+    const world = newWorld();
+    pending(world, 'neighborLoan', { neighborId: 'bot-mia', amount: 200 });
+    player(world).lent = [{ uid: 'l', neighborId: 'bot-boris', amount: 200, dueWeek: 8, tries: 1 }];
+    const raw = JSON.parse(JSON.stringify(world));
+    raw.version = 7;
+    for (const p of raw.players) delete p.noAskUntil;
+    const before = structuredClone(raw);
+    const migrated = migrateWorld(raw)!;
+    expect(migrated).toEqual(world);
+    expect(migrated.players.every((p) => Object.keys(p.noAskUntil).length === 0)).toBe(true);
+    migrated.players[0].noAskUntil['bot-mia'] = 21;
+    expect(migrated.players.slice(1).every((p) => Object.keys(p.noAskUntil).length === 0)).toBe(true);
+    expect(raw).toEqual(before);
+  });
+
+  it('v8 сохраняет запреты на просьбы и проверяет noAskUntil', () => {
+    const world = newWorld();
+    player(world).noAskUntil = { 'bot-mia': 21, 'bot-boris': 1000000 };
+    expect(migrateWorld(world)).toEqual(world);
+    for (const value of [undefined, null, [], 20, { 'bot-mia': '21' }, { 'bot-mia': -1 },
+      { 'bot-mia': 1.5 }, { 'bot-mia': NaN }, { 'bot-mia': Infinity }]) {
+      const bad = structuredClone(world);
+      Object.assign(player(bad), { noAskUntil: value });
       expect(migrateWorld(bad)).toBeNull();
     }
   });
