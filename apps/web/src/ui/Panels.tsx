@@ -96,7 +96,7 @@ export function MobileLayout() {
       <button className="sheet-handle" onClick={() => setOpen(!open)} aria-label={open ? t.ui.collapse : t.ui.expand}>
         <span />
       </button>
-      {!open && <div className="sheet-freedom"><FreedomBlock /></div>}
+      {!open && <div className="sheet-freedom"><FreedomBlock compact /></div>}
       <Tabs tabs={['report', 'deals', 'island', 'actions']} />
       {open && <div className="tab-scroll"><TabContent tab={tab} /></div>}
       <div className="sheet-cta"><NextWeekButton compact /></div>

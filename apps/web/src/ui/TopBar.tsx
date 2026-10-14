@@ -2,13 +2,13 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { financeView, getPlayer } from '@arch/engine';
 import { HUMAN, useGame } from '../store';
 import { Coin, ConfirmButton, Meter } from './common';
-import { NeighborsBar, type NeighborsSize } from './Neighbors';
+import { NeighborsBar, NewsTicker, type NeighborsSize } from './Neighbors';
 import { useMediaQuery } from './Panels';
 import { AudioControls } from '../audio/AudioControls';
 import { displayPlayer, useI18n } from '../i18n';
 
 /** Выбираем размер по свободному промежутку, независимо от аватаров в плашке. */
-function useNeighborsLayout(desktop: boolean, islandName: string, week: number, selected: string | null) {
+function useNeighborsLayout(desktop: boolean, islandName: string, week: number, selected: string | null, challengeName?: string) {
   const topRef = useRef<HTMLElement>(null);
   const [size, setSize] = useState<NeighborsSize>('compact');
   useLayoutEffect(() => {
@@ -67,7 +67,7 @@ function useNeighborsLayout(desktop: boolean, islandName: string, week: number, 
       window.removeEventListener('resize', schedule);
       document.fonts.removeEventListener('loadingdone', schedule);
     };
-  }, [desktop, islandName, week, selected, size]);
+  }, [desktop, islandName, week, selected, size, challengeName]);
   return { topRef, size };
 }
 
@@ -92,7 +92,8 @@ export function TopBar() {
   const fin = financeView(world, HUMAN);
   const desktop = useMediaQuery('(min-width: 1024px)');
   const selected = useGame((s) => s.neighborId);
-  const { topRef, size } = useNeighborsLayout(desktop, shown.islandName, world.week, selected);
+  const challenge = useGame((s) => s.challenge);
+  const { topRef, size } = useNeighborsLayout(desktop, shown.islandName, world.week, selected, challenge?.name);
 
   return (
     <header className="top" ref={topRef} data-neighbors-size={desktop ? size : undefined}>
@@ -102,7 +103,7 @@ export function TopBar() {
           <div className="title">{shown.islandName}</div>
           <div className="sub">{t.ui.week} {world.week}<span className="badge-detail">{me.freedomWeek ? ` · ${t.ui.neighbors.freedom} ${t.ui.epilogue.since(me.freedomWeek)}` : ''}{me.employed ? '' : ` · ${t.ui.neighbors.withoutWork.toLowerCase()}`}</span></div>
         </div>
-        <NeighborsBar compact />
+        <NeighborsBar compact replaceSelf={!desktop} />
         {/* На телефоне верхняя строка заполнена до предела: там язык — в приветствии и в настройках звука */}
         {desktop && (
           <div className="language-switch" aria-label={t.ui.language}>
@@ -140,6 +141,7 @@ export function TopBar() {
           </div>
         </div>
       </div>
+      {!desktop && challenge && <div className="mobile-challenge-news"><NewsTicker /></div>}
     </header>
   );
 }

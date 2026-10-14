@@ -7,9 +7,11 @@ import {
 } from '@arch/engine';
 import { HUMAN, useGame, type FreedomHistory } from '../store';
 import { fmt } from '../format';
-import { assetCopy, displayPlayer, getI18n, newsText, useI18n } from '../i18n';
+import { assetCopy, displayPlayer, getI18n, momentText, newsText, useI18n } from '../i18n';
 import { levelTitle, lowerFirst, percent } from './text';
 import { Meter } from './common';
+import { GhostCard } from './GhostCard';
+import { GHOST_ID, ghostProgress } from '../challenge';
 
 /** Цвет аватара по порядку игроков в мире: вы, Мия, Тимур, Борис. */
 const AVATAR = ['#3E9A9A', '#E8735A', '#F0A93B', '#7B6CC4'];
@@ -18,11 +20,11 @@ const colorOf = (world: WorldState, playerId: string) =>
   AVATAR[Math.max(0, world.players.findIndex((p) => p.id === playerId)) % AVATAR.length];
 
 const renderedNews = (item: ReturnType<typeof useGame.getState>['news'][number], players: readonly PlayerState[]) =>
-  'text' in item ? item.text : newsText(item, players);
+  'text' in item ? item.text : item.kind === 'ghost' ? getI18n().t.ui.challenge.news(item.name, momentText(item.moment)) : newsText(item, players);
 
 // ───────── Аватар с кольцом прогресса к свободе ─────────
 
-function RingAvatar({ letter, color, ratio, size = 40, free }: { letter: string; color: string; ratio: number; size?: number; free: boolean }) {
+export function RingAvatar({ letter, color, ratio, size = 40, free }: { letter: string; color: string; ratio: number; size?: number; free: boolean }) {
   const r = size / 2 - 2.5;
   const c = 2 * Math.PI * r;
   const k = Math.max(0, Math.min(1, ratio));
@@ -93,7 +95,7 @@ function insightFor(world: WorldState, p: PlayerState, views: AssetView[]): Insi
 
 // ───────── График пути к свободе ─────────
 
-function Sparkline({ history, id, color }: { history: FreedomHistory; id: string; color: string }) {
+export function Sparkline({ history, id, color, name }: { history: FreedomHistory; id: string; color: string; name?: string }) {
   const { t } = useI18n();
   const line = history[id] ?? [];
   const mine = history[HUMAN] ?? [];
@@ -116,7 +118,7 @@ function Sparkline({ history, id, color }: { history: FreedomHistory; id: string
         <path d={path(line)} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
       </svg>
       <div className="spark-legend">
-        <span><i style={{ background: color }} /> {t.ui.neighbors.neighbor}</span>
+        <span><i style={{ background: color }} /> {name ?? t.ui.neighbors.neighbor}</span>
         <span><i className="me" /> {t.ui.neighbors.you}</span>
         <span className="muted">{t.ui.neighbors.dashed}</span>
       </div>
@@ -234,7 +236,7 @@ export function NeighborCard({ playerId, onClose }: { playerId: string; onClose:
 
 // ───────── Лента новостей недели ─────────
 
-function NewsTicker() {
+export function NewsTicker() {
   const world = useGame((s) => s.world)!;
   const news = useGame((s) => s.news);
   const week = world.lastReport?.week;
@@ -256,15 +258,18 @@ function NewsTicker() {
 export type NeighborsSize = 'full' | 'medium' | 'compact' | 'badge';
 
 /** Компьютер: три размера в верхней строке; телефон (`compact`) — аватары в плашке. */
-export function NeighborsBar({ compact, size = 'full' }: { compact?: boolean; size?: NeighborsSize }) {
+export function NeighborsBar({ compact, replaceSelf = false, size = 'full' }: { compact?: boolean; replaceSelf?: boolean; size?: NeighborsSize }) {
   const { t } = useI18n();
   const world = useGame((s) => s.world)!;
   const selected = useGame((s) => s.neighborId);
   const show = useGame((s) => s.showNeighbor);
+  const challenge = useGame((s) => s.challenge);
   const rows = leaderboard(world);
 
-  const chips = (mode: NeighborsSize, interactive = true) => rows.map((r, place) => {
+  const chips = (mode: NeighborsSize, interactive = true) => <>{rows.map((r, place) => {
     const me = !r.isBot;
+    // В мини-полоске призрак занимает место собственного аватара — ровно четыре чипа.
+    if (compact && replaceSelf && challenge && me) return null;
     const shown = displayPlayer({ id: r.playerId, name: r.name, islandName: r.islandName, isBot: r.isBot });
     const color = colorOf(world, r.playerId);
     const free = r.freedomWeek !== null;
@@ -291,7 +296,17 @@ export function NeighborsBar({ compact, size = 'full' }: { compact?: boolean; si
         {contents}
       </button>
     );
-  });
+  })}{challenge && (() => {
+    const pct = ghostProgress(challenge, world.week);
+    const label = `${challenge.name} (${t.ui.challenge.label}): ${pct}%`;
+    const content = <>
+      <span className="ghost-avatar"><RingAvatar letter={Array.from(challenge.name)[0]} color="#7B6CC4" ratio={pct / 100} size={mode === 'full' ? 38 : 32} free={pct >= 100} /></span>
+      {(mode === 'full' || mode === 'medium') ? <span className="nb-text"><b>{challenge.name}</b><small>{t.ui.challenge.label} · {pct}%</small></span>
+        : <span className="ghost-tag" aria-hidden>{t.ui.challenge.label}</span>}
+    </>;
+    return interactive ? <button key={GHOST_ID} className={`nb-chip ghost-chip ${selected === GHOST_ID ? 'active' : ''}`} title={label} aria-label={label} onClick={() => show(GHOST_ID)}>{content}</button>
+      : <span key={GHOST_ID} className="nb-chip ghost-chip">{content}</span>;
+  })()}</>;
 
   if (compact) return <div className="nb-mini">{chips('compact')}</div>;
   const race = t.ui.neighbors.race.split('\n');
@@ -311,7 +326,7 @@ export function NeighborsBar({ compact, size = 'full' }: { compact?: boolean; si
       </div>
       <div className="neighbor-dropdown">
         <NewsTicker />
-        {selected && <NeighborCard playerId={selected} onClose={() => show(null)} />}
+        {selected && (selected === GHOST_ID ? <GhostCard onClose={() => show(null)} /> : <NeighborCard playerId={selected} onClose={() => show(null)} />)}
       </div>
     </div>
   );
@@ -325,7 +340,7 @@ export function NeighborModal() {
   return (
     <div className="modal-backdrop neighbor-modal" onClick={() => show(null)}>
       <div onClick={(e) => e.stopPropagation()}>
-        <NeighborCard playerId={selected} onClose={() => show(null)} />
+        {selected === GHOST_ID ? <GhostCard onClose={() => show(null)} /> : <NeighborCard playerId={selected} onClose={() => show(null)} />}
       </div>
     </div>
   );

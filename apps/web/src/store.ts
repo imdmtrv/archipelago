@@ -6,6 +6,7 @@ import {
 import type { DreamProgress, FloatLabel, PlacedItem, Weather } from './scene/contract';
 import { onAction, onWeek, onWeather, startGameSounds, stopGameSounds } from './audio/gameSounds';
 import { errorText, getI18n } from './i18n';
+import { validChallenge, validMoments, type ChallengeData, type Moment } from './challenge';
 
 export const HUMAN = 'p1';
 const SAVE_KEY = new URLSearchParams(location.search).has('director') ? 'archipelago.director.save' : 'archipelago.save.v1';
@@ -17,24 +18,32 @@ export interface Toast { id: number; text: string; tone: 'good' | 'bad' | 'neutr
 /** `epilogue` — на этой неделе достроена мечта: вместо обычных итогов недели показываем эпилог. */
 export interface WeekModal { report: WeekReport; events: GameEvent[]; freedom: boolean; epilogue: boolean }
 /** playerId нет у новостей из сохранений до экрана соседей. */
-export type NewsItem = ({ week: number; text: string; playerId?: string } | ({ week: number } & WeekNewsItem));
+export type NewsItem = ({ week: number; text: string; playerId?: string } | ({ week: number; playerId: string; kind: 'ghost'; name: string; moment: Moment }) | ({ week: number } & WeekNewsItem));
 /** Доля свободы каждого игрока по неделям — для графиков на карточках соседей. */
 export type FreedomHistory = Record<string, { week: number; ratio: number }[]>;
 
 const HISTORY_LIMIT = 160;
 
-interface Saved { world: WorldState; news: NewsItem[]; history: FreedomHistory }
+interface Saved { world: WorldState; news: NewsItem[]; history: FreedomHistory; moments: Moment[]; challenge: ChallengeData | null; boughtDefIds: string[] }
 
 /** Сохранение любой поддерживаемой версии мира → текущая версия. Непонятное сохранение игнорируем. */
 function load(): Saved | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const saved = JSON.parse(raw) as { world?: unknown; news?: NewsItem[]; history?: FreedomHistory } | null;
+    const saved = JSON.parse(raw) as { world?: unknown; news?: NewsItem[]; history?: FreedomHistory; moments?: unknown; challenge?: unknown; boughtDefIds?: unknown } | null;
     const world = migrateWorld(saved?.world);
     if (!world) return null;
     const history = saved?.history && typeof saved.history === 'object' ? saved.history : {};
-    return { world, news: Array.isArray(saved?.news) ? saved.news : [], history };
+    // Старые графики отмечали начало следующей недели; запись вызова — конец сыгранной.
+    if (saved?.moments === undefined) for (const id of Object.keys(history)) {
+      history[id] = history[id].map((p) => ({ ...p, week: p.week - 1 })).filter((p) => p.week > 0);
+    }
+    const moments = validMoments(saved?.moments, world.week) ? saved.moments : [];
+    const boughtDefIds = Array.isArray(saved?.boughtDefIds) ? saved.boughtDefIds.filter((id): id is string => typeof id === 'string' && Object.hasOwn(ASSET_DEFS, id))
+      : [...new Set([...moments.filter((m) => m.kind === 'bought').map((m) => m.defId!), ...getPlayer(world, HUMAN).owned.map((a) => a.defId)])];
+    return { world, news: Array.isArray(saved?.news) ? saved.news : [], history, moments, boughtDefIds,
+      challenge: validChallenge(saved?.challenge) && saved.challenge.seed === world.seed ? saved.challenge : null };
   } catch {
     return null;
   }
@@ -42,11 +51,14 @@ function load(): Saved | null {
 
 /** Добавить в историю точку текущей недели для всех игроков. */
 function recordHistory(history: FreedomHistory, world: WorldState): FreedomHistory {
+  const week = world.lastReport?.week ?? 0;
+  if (week === 0) return history;
   const next: FreedomHistory = { ...history };
   for (const p of world.players) {
     const ratio = Math.round(financeView(world, p.id).freedomRatio * 1000) / 1000;
-    const line = (next[p.id] ?? []).filter((pt) => pt.week < world.week);
-    next[p.id] = [...line, { week: world.week, ratio }].slice(-HISTORY_LIMIT);
+    const line = (next[p.id] ?? []).filter((pt) => pt.week < week);
+    const points = [...line, { week, ratio }];
+    next[p.id] = p.id === HUMAN ? points : points.slice(-HISTORY_LIMIT);
   }
   return next;
 }
@@ -64,6 +76,11 @@ interface GameStore {
   world: WorldState | null;
   news: NewsItem[];
   history: FreedomHistory;
+  moments: Moment[];
+  /** Помним первую покупку даже после вытеснения её момента из короткой записи. */
+  boughtDefIds: string[];
+  challenge: ChallengeData | null;
+  shareFallback: string | null;
   /** Чья карточка соседа открыта; null — ничья. */
   neighborId: string | null;
   floats: FloatLabel[];
@@ -76,7 +93,7 @@ interface GameStore {
   highlightUid: string | null;
   busy: boolean;
 
-  newGame(islandName: string, playerName: string): void;
+  newGame(islandName: string, playerName: string, seed?: number, challenge?: ChallengeData | null): void;
   resetGame(): void;
   act(action: Exclude<Action, { type: 'endWeek' }>, success?: string): boolean;
   endWeek(): void;
@@ -116,7 +133,11 @@ export const useGame = create<GameStore>((set, get) => {
   return {
     world: saved?.world ?? null,
     news: saved?.news ?? [],
-    history: saved ? recordHistory(saved.history, saved.world) : {},
+    history: saved?.history ?? {},
+    moments: saved?.moments ?? [],
+    boughtDefIds: saved?.boughtDefIds ?? [],
+    challenge: saved?.challenge ?? null,
+    shareFallback: null,
     neighborId: null,
     floats: [],
     weather: 'clear',
@@ -128,13 +149,13 @@ export const useGame = create<GameStore>((set, get) => {
     highlightUid: null,
     busy: false,
 
-    newGame(islandName, playerName) {
+    newGame(islandName, playerName, seed, challenge = null) {
       clearTimers();
       if (get().world) stopGameSounds();
-      const world = createWorld({ seed: Math.floor(Math.random() * 2 ** 31), playerName, islandName });
+      const world = createWorld({ seed: seed ?? Math.floor(Math.random() * 2 ** 31), playerName, islandName });
       const history = recordHistory({}, world);
-      set({ world, news: [], history, neighborId: null, modal: null, choiceOpen: false, tab: 'deals', floats: [], weather: 'clear', busy: false, toast: null });
-      save({ world, news: [], history });
+      set({ world, news: [], history, moments: [], boughtDefIds: [], challenge, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, tab: 'deals', sheetOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
+      save({ world, news: [], history, moments: [], boughtDefIds: [], challenge });
       startGameSounds(world);
     },
 
@@ -142,7 +163,7 @@ export const useGame = create<GameStore>((set, get) => {
       clearTimers();
       stopGameSounds();
       save(null);
-      set({ world: null, news: [], history: {}, neighborId: null, modal: null, choiceOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
+      set({ world: null, news: [], history: {}, moments: [], boughtDefIds: [], challenge: null, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
     },
 
     act(action, success) {
@@ -153,14 +174,29 @@ export const useGame = create<GameStore>((set, get) => {
         // Движок может снять устаревшую развилку даже при ошибке (актив уже продан).
         if (action.type === 'resolveChoice') {
           set({ world: res.world, choiceOpen: !!choiceView(res.world, HUMAN) });
-          save({ world: res.world, news: get().news, history: get().history });
+          save({ world: res.world, news: get().news, history: get().history, moments: get().moments, boughtDefIds: get().boughtDefIds, challenge: get().challenge });
         }
         onAction(action, world, res.world, res.error);
         get().showToast(errorText(res.error), 'bad');
         return false;
       }
-      set({ world: res.world, ...(action.type === 'resolveChoice' ? { choiceOpen: false } : {}) });
-      save({ world: res.world, news: get().news, history: get().history });
+      const moments = [...get().moments];
+      const boughtDefIds = [...get().boughtDefIds];
+      if (action.playerId === HUMAN) {
+        if (action.type === 'buyOffer') {
+          const prior = new Set(getPlayer(world, HUMAN).owned.map((a) => a.uid));
+          const bought = getPlayer(res.world, HUMAN).owned.find((a) => !prior.has(a.uid));
+          if (bought && !boughtDefIds.includes(bought.defId)) {
+            moments.push({ week: world.week, kind: 'bought', defId: bought.defId });
+            boughtDefIds.push(bought.defId);
+          }
+        } else if (action.type === 'upgradeAsset') {
+          const asset = getPlayer(res.world, HUMAN).owned.find((a) => a.uid === action.assetUid);
+          if (asset) moments.push({ week: world.week, kind: 'upgraded', defId: asset.defId, level: asset.level });
+        }
+      }
+      set({ world: res.world, moments: moments.slice(-20), boughtDefIds, ...(action.type === 'resolveChoice' ? { choiceOpen: false } : {}) });
+      save({ world: res.world, news: get().news, history: get().history, moments: get().moments, boughtDefIds, challenge: get().challenge });
       onAction(action, world, res.world);
 
       // Улучшение — над объектом всплывает прибавка к доходу
@@ -211,13 +247,24 @@ export const useGame = create<GameStore>((set, get) => {
       const report = res.world.lastReport;
       const sounds = onWeek(report, world, res.world);
       const mine = report.players[HUMAN];
+      const moments = [...get().moments];
+      for (const event of mine.events) {
+        if (event.id === 'dreamDone') moments.push({ week: report.week, kind: 'dreamStage', level: getPlayer(res.world, HUMAN).dream!.built });
+        if (event.id === 'freedom' || event.id === 'dreamDone') moments.push({ week: report.week, kind: event.id });
+        if (event.id === 'freedomLevel') moments.push({ week: report.week, kind: 'freedomLevel', level: Number(event.params?.level) });
+        if (event.id === 'dreamStage') moments.push({ week: report.week, kind: 'dreamStage', level: Number(event.params?.finishedStage) + 1 });
+      }
+      const challenge = get().challenge;
+      const ghostNews: NewsItem[] = challenge ? challenge.moments.filter((m) => m.week === report.week)
+        .map((moment) => ({ week: report.week, playerId: 'challenge-ghost', kind: 'ghost', name: challenge.name, moment })) : [];
       const news = [
+        ...ghostNews,
         ...report.news.map((n) => ({ week: report.week, ...n })),
         ...get().news,
       ].slice(0, 80);
       const history = recordHistory(get().history, res.world);
-      set({ world: res.world, news, history, busy: true });
-      save({ world: res.world, news, history });
+      set({ world: res.world, news, history, moments: moments.slice(-20), busy: true });
+      save({ world: res.world, news, history, moments: get().moments, boughtDefIds: get().boughtDefIds, challenge });
 
       // Деньги «текут» на острове: зарплата над домом, доход над каждым активом
       const owned = new Map(res.world.players[0].owned.map((a) => [a.uid, a]));

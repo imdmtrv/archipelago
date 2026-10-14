@@ -3,15 +3,25 @@ import { IslandScene } from './scene/IslandScene';
 import { dreamProgress, placedItems, useGame } from './store';
 import { TopBar } from './ui/TopBar';
 import { DesktopLayout, MobileLayout, useMediaQuery } from './ui/Panels';
-import { ToastView, WeekModal, WelcomeModal } from './ui/Modals';
+import { ShareFallbackModal, ToastView, WeekModal, WelcomeModal } from './ui/Modals';
 import { NeighborModal } from './ui/Neighbors';
 import { ChoiceModal } from './ui/ChoiceModal';
 import { FeedbackPrompt } from './ui/FeedbackPrompt';
 import { useUiSound } from './audio/useUiSound';
 import { Coach } from './ui/GuidedCoach';
-import { initAnalytics } from './analytics';
+import { initAnalytics, track } from './analytics';
+import { decodeChallenge } from './challenge';
 
 initAnalytics();
+
+const challengeUrl = new URL(location.href);
+const code = challengeUrl.searchParams.get('c');
+const incomingChallenge = code === null ? null : decodeChallenge(code);
+if (code !== null) {
+  track('challenge-open');
+  challengeUrl.searchParams.delete('c');
+  window.history.replaceState(window.history.state, '', challengeUrl.href);
+}
 
 /** Какую долю ширины экрана занимают боковые колонки интерфейса (только раскладка для компьютера). */
 function useSideInsets(enabled: boolean): [number, number] {
@@ -35,6 +45,7 @@ function useSideInsets(enabled: boolean): [number, number] {
 export default function App() {
   useUiSound();
   const world = useGame((s) => s.world);
+  const [invite, setInvite] = useState(incomingChallenge);
   const floats = useGame((s) => s.floats);
   const weather = useGame((s) => s.weather);
   const sheetOpen = useGame((s) => s.sheetOpen);
@@ -67,13 +78,14 @@ export default function App() {
           {isMobile ? <MobileLayout /> : <DesktopLayout />}
         </div>
       )}
-      {!world && <WelcomeModal />}
+      {(!world || invite) && <WelcomeModal challenge={invite} onDismiss={() => setInvite(null)} />}
       {world && isMobile && <NeighborModal />}
       <WeekModal />
       <ChoiceModal />
       {world && <FeedbackPrompt />}
       <ToastView />
-      <Coach />
+      <ShareFallbackModal />
+      {!invite && <Coach />}
     </>
   );
 }

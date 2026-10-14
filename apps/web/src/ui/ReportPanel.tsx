@@ -3,9 +3,10 @@ import { HUMAN, useGame } from '../store';
 import { Meter, Pips } from './common';
 import { lowerFirst, percent } from './text';
 import { levelGenitive, levelTitle, useI18n, weeks } from '../i18n';
+import { ShareButton } from './ShareButton';
 
 /** До свободы шкала 0–100%; после — шкала запаса до последнего уровня, с отметками уровней. */
-export function FreedomBlock() {
+export function FreedomBlock({ compact = false }: { compact?: boolean }) {
   const { t, fmt } = useI18n();
   const world = useGame((s) => s.world)!;
   const fin = financeView(world, HUMAN);
@@ -69,6 +70,8 @@ export function FreedomBlock() {
           {t.ui.report.employedShortfall}
         </div>
       )}
+      {/* Вызов — только после свободы: понятный результат «свобода за N недель» и полный путь призрака */}
+      {!compact && <ShareButton challenge className="btn ghost challenge-button" />}
     </div>
   );
 }

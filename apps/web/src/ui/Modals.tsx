@@ -2,31 +2,38 @@ import { useEffect, useState } from 'react';
 import { DREAM_WORK_EMPLOYED, getPlayer } from '@arch/engine';
 import { HUMAN, useGame, type WeekModal as WeekModalData } from '../store';
 import { fmt, signed, weeksAcc } from '../format';
-import { dictFor, dreamCopy, eventCopy, useI18n, type Lang } from '../i18n';
+import { challengeComparison, challengeResult, dictFor, dreamCopy, eventCopy, useI18n, type Lang } from '../i18n';
 import { Confetti } from './common';
 import { EpilogueModal } from './Epilogue';
 import { daysText, lowerFirst, speedUpText } from './text';
 import { Emblem } from './TopBar';
-import { share } from '../share';
+import { ShareButton } from './ShareButton';
+import type { ChallengeData } from '../challenge';
 import { track } from '../analytics';
 
-export function WelcomeModal() {
+export function WelcomeModal({ challenge = null, onDismiss }: { challenge?: ChallengeData | null; onDismiss?: () => void }) {
   const { t, lang, setLang } = useI18n();
   const newGame = useGame((s) => s.newGame);
-  const [island, setIsland] = useState(t.meta.defaultIsland);
+  const hasGame = useGame((s) => !!s.world);
+  const [island, setIsland] = useState(challenge?.island ?? t.meta.defaultIsland);
   const [name, setName] = useState('');
   const feedbackUrl = import.meta.env.VITE_FEEDBACK_URL?.trim();
   const switchLanguage = (next: Lang) => {
     const currentDefault = dictFor(lang).meta.defaultIsland;
     const nextDefault = dictFor(next).meta.defaultIsland;
-    if (island === currentDefault) setIsland(nextDefault);
+    if (!challenge && island === currentDefault) setIsland(nextDefault);
     setLang(next);
   };
   return (
     <div className="modal-backdrop">
       <form
         className="modal panel welcome"
-        onSubmit={(e) => { e.preventDefault(); newGame(island.trim() || t.meta.defaultIsland, name.trim() || t.meta.defaultPlayer); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          newGame(island.trim() || t.meta.defaultIsland, name.trim() || t.meta.defaultPlayer, challenge?.seed, challenge);
+          if (challenge) track('challenge-start');
+          onDismiss?.();
+        }}
       >
         <div className="welcome-language language-switch" aria-label={t.ui.language}>
           <button type="button" className={lang === 'ru' ? 'active' : ''} onClick={() => switchLanguage('ru')}>RU</button>
@@ -34,7 +41,8 @@ export function WelcomeModal() {
         </div>
         <Emblem />
         <h2>{t.meta.app}</h2>
-        <p className="lead">{t.ui.welcome.lead}</p>
+        <p className="lead">{challenge ? challengeResult(challenge) : t.ui.welcome.lead}</p>
+        {challenge && hasGame && <p className="challenge-warning">{t.ui.challenge.replace}</p>}
         <ul className="rules">
           <li><b className="pos">{t.ui.welcome.asset}</b> {t.ui.welcome.assetRule}</li>
           <li><b className="neg">{t.ui.welcome.liability}</b> {t.ui.welcome.liabilityRule}</li>
@@ -49,7 +57,8 @@ export function WelcomeModal() {
           <span>{t.ui.welcome.name}</span>
           <input value={name} maxLength={20} placeholder={t.meta.exampleName} onChange={(e) => setName(e.target.value)} />
         </label>
-        <button className="btn primary big" type="submit">{t.ui.welcome.start}</button>
+        <button className="btn primary big" type="submit">{challenge && hasGame ? t.ui.challenge.accept : t.ui.welcome.start}</button>
+        {challenge && hasGame && <button className="btn ghost big" type="button" onClick={onDismiss}>{t.ui.challenge.continue}</button>}
         {feedbackUrl && <a className="secondary-link feedback-link" href={feedbackUrl} target="_blank" rel="noreferrer" onClick={() => track('feedback-open')}>{t.ui.welcome.feedback}</a>}
       </form>
     </div>
@@ -97,6 +106,7 @@ function WeekSummary({ modal }: { modal: WeekModalData }) {
 export function WeekModal() {
   const { t } = useI18n();
   const modal = useGame((s) => s.modal);
+  const challenge = useGame((s) => s.challenge);
   const close = useGame((s) => s.closeModal);
   const act = useGame((s) => s.act);
   useEffect(() => {
@@ -131,7 +141,8 @@ export function WeekModal() {
               {t.ui.weekModal.freedomLead1}{' '}
               {t.ui.weekModal.freedomLead2(weeksAcc(modal.report.week))}
             </p>
-            <button className="btn ghost share-result" type="button" onClick={() => void share(t.ui.shareFreedom(weeksAcc(modal.report.week)))}>{t.ui.share.button}</button>
+            {challenge && <p className="challenge-comparison">{challengeComparison(modal.report.week, challenge)}</p>}
+            <ShareButton text={t.ui.shareFreedom(weeksAcc(modal.report.week))} />
             {dreamTitle && <div className="dream-unlocked">{t.ui.weekModal.dreamUnlocked(dreamTitle)}</div>}
           </>
         ) : (
@@ -160,6 +171,27 @@ export function WeekModal() {
       </div>
     </div>
   );
+}
+
+/** Если браузер запретил буфер обмена, ссылка остаётся доступна для ручного копирования. */
+export function ShareFallbackModal() {
+  const { t } = useI18n();
+  const content = useGame((s) => s.shareFallback);
+  const close = () => useGame.setState({ shareFallback: null });
+  useEffect(() => {
+    if (!content) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [content]);
+  if (!content) return null;
+  return <div className="modal-backdrop share-fallback" onClick={close}>
+    <div className="modal panel" role="dialog" aria-modal="true" aria-label={t.ui.challenge.copy} onClick={(e) => e.stopPropagation()}>
+      <p>{t.ui.challenge.downloadOnly}</p>
+      <textarea className="challenge-link" readOnly value={content} aria-label={t.ui.challenge.copy} onFocus={(e) => e.target.select()} autoFocus />
+      <button className="btn primary big" type="button" onClick={close}>{t.ui.challenge.close}</button>
+    </div>
+  </div>;
 }
 
 export function ToastView() {
