@@ -157,6 +157,12 @@ export const ru = {
       upgrades: [],
     },
   },
+  professions: {
+    keeper: { title: 'Смотритель маяка', text: 'Получает немного, но и тратит мало — финиш свободы близко.' },
+    teacher: { title: 'Учитель', text: 'Средняя зарплата и средние расходы — ровный путь.' },
+    captain: { title: 'Капитан парома', text: 'Хорошо зарабатывает, но и жизнь у капитана недешёвая.' },
+    doctor: { title: 'Врач', text: 'Высокая зарплата и высокие расходы, а на старте — кредит за учёбу.' },
+  },
   dream: {
     title: 'Шхуна для кругосветки',
     description: 'Своя шхуна, на которой можно обойти весь мир. Её строят на стапеле у берега — этап за этапом.',
@@ -186,6 +192,7 @@ export const ru = {
     coinGenitive: { one: 'монеты', few: 'монет', many: 'монет', other: 'монет' },
   },
   news: {
+    layoff: (name: string) => `${name}: сокращение — несколько недель без зарплаты`,
     bought: (name: string, female: boolean, asset: string) => `${name} ${female ? 'купила' : 'купил'} ${asset}`,
     sold: (name: string, female: boolean, asset: string) => `${name} ${female ? 'продала' : 'продал'} ${asset}`,
     upgraded: (name: string, female: boolean, before: string, after: string) =>
@@ -391,6 +398,21 @@ export const ru = {
       title: 'Страховка действует',
       text: 'Страховка вступила в силу: теперь шторм и болезнь не ударят по карману.',
     },
+    layoff: {
+      title: 'Сокращение',
+      reason: {
+        keeper: 'Маяк перевели на автоматику.',
+        teacher: 'Школу на острове закрыли на ремонт.',
+        captain: 'Паромную линию закрыли до весны.',
+        doctor: 'Лечебницу объединили с соседней.',
+      },
+      text: (reason: string, weeks: string) =>
+        `${reason} Зарплаты не будет ${weeks}, пока не найдётся новое место. Выручат подушка и доход от активов.`,
+    },
+    layoffOver: {
+      title: 'Работа нашлась',
+      text: 'Нашлось новое место — зарплата снова приходит каждую неделю.',
+    },
   },
   ui: {
     perWeek: '/нед',
@@ -475,6 +497,13 @@ export const ru = {
     audioCatalog: 'Выбрать запись или синтез →',
     audioCredits: 'Авторы и лицензии звуков ↗',
     welcome: {
+      profession: 'Кем вы работаете?',
+      professionHint: 'К свободе ведёт не размер зарплаты, а разница между доходом и расходами.',
+      professionSalary: (coins: string) => `Зарплата ${coins}`,
+      professionLiving: (coins: string) => `Расходы ${coins}`,
+      professionCash: (coins: string) => `На старте ${coins}`,
+      professionLoan: (coins: string) => `Кредит за учёбу ${coins}`,
+      professionChallenge: (profession: string) => `В вызове — та же профессия: ${profession}`,
       lead: 'У вас есть маленький остров, работа и 600 монет. Соседи по архипелагу начинают с тем же.',
       asset: 'Активы',
       assetRule: 'приносят деньги каждую неделю — даже когда вы не работаете.',
@@ -539,6 +568,7 @@ export const ru = {
       liabilities: 'Пассивы — забирают деньги из кармана',
     },
     report: {
+      layoff: (weeks: string) => `Сокращение: без зарплаты ещё ${weeks}`,
       toFreedom: 'До финансовой свободы',
       covered: 'Расходы покрыты! Свобода засчитается, если доход',
       hold: 'продержится до конца недели',

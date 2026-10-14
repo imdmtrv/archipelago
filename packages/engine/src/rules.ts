@@ -113,3 +113,8 @@ export const BUYER_PREMIUM: [number, number] = [1.2, 1.45]; // покупате�
 
 // ───────────── Цели ─────────────
 export const GOALS_ACTIVE = 3;              // столько целей видно одновременно
+
+// ───────────── Сокращение ─────────────
+// Личное событие `layoff` с весом 0.06 в PERSONAL_EVENT_WEIGHTS (добавляет исполнитель движка).
+export const LAYOFF_WEEKS: [number, number] = [3, 6]; // столько недель без зарплаты
+export const LAYOFF_COOLDOWN = 30;          // не чаще одного сокращения за 30 недель

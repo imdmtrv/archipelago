@@ -1,5 +1,5 @@
 // Контент: все сделки архипелага. Числа — базовые, конкретное предложение отклоняется от них случайно.
-import type { AssetDef, DealKind, DreamDef, GoalDef } from './types';
+import type { AssetDef, DealKind, DreamDef, GoalDef, ProfessionDef, ProfessionId } from './types';
 import * as R from './rules';
 
 // Улучшения (`upgrades`) стоят дороже самой сделки и окупаются медленнее новой покупки: при рынке 1.0
@@ -157,6 +157,21 @@ export const GOALS: GoalDef[] = [
   { id: 'debtFree', reward: { cash: 50, joy: 3 } },       // закрыть все кредиты (выдаётся, если кредит был)
   { id: 'level150', reward: { cash: 150, joy: 5 } },      // «Уверенность»: 150%
 ];
+
+/**
+ * Профессии. Урок: к свободе ведёт не размер зарплаты, а разница между доходом и расходами — финиш свободы равен
+ * расходам. Смотритель маяка быстрее всех к свободе, но беднее; врач богаче, но тяжелее стартует (кредит за учёбу).
+ * Числа — стартовые для подбора симулятором (пределы — в docs/specs/professions.md). Учитель — прежние 180 / 150 / 600.
+ */
+export const PROFESSIONS: Record<ProfessionId, ProfessionDef> = {
+  keeper: { id: 'keeper', salary: 130, living: 100, cash: 400, loan: 0 },
+  teacher: { id: 'teacher', salary: 180, living: 150, cash: 600, loan: 0 },
+  captain: { id: 'captain', salary: 260, living: 220, cash: 700, loan: 0 },
+  doctor: { id: 'doctor', salary: 360, living: 270, cash: 400, loan: 1500 },
+};
+
+/** Порядок карточек на старте. */
+export const PROFESSION_ORDER: ProfessionId[] = ['keeper', 'teacher', 'captain', 'doctor'];
 
 /** Мечты. Пока одна — шхуна; выбор мечты на старте появится вместе с профессиями. */
 export const DREAMS: Record<string, DreamDef> = {

@@ -4,7 +4,7 @@ import { newGoalsState } from './goals';
 import { fillInitialBoard } from './offers';
 import { Rng } from './rng';
 import * as R from './rules';
-import type { BotStyle, DreamState, PlayerState, WorldState } from './types';
+import type { ProfessionId, BotStyle, DreamState, PlayerState, WorldState } from './types';
 
 export const HUMAN_ID = 'p1';
 
@@ -43,6 +43,10 @@ function newPlayer(id: string, name: string, islandName: string, botStyle?: BotS
     bestLevel: 0,
     // Мечта есть только у человека; соседи-боты остаются на работе без мечты.
     dream: botStyle ? null : newDreamState(),
+    // TODO(движок): профессия из выбора игрока / ростера ботов, её зарплата, расходы, деньги и кредит
+    profession: 'teacher',
+    layoffWeeks: 0,
+    lastLayoffWeek: 0,
     choice: null,
     lastChoiceWeek: 0,
     lent: [],
@@ -53,9 +57,9 @@ function newPlayer(id: string, name: string, islandName: string, botStyle?: BotS
   return player;
 }
 
-export function createWorld(opts: { seed: number; playerName: string; islandName: string }): WorldState {
+export function createWorld(opts: { seed: number; playerName: string; islandName: string; profession?: ProfessionId }): WorldState {
   const world: WorldState = {
-    version: 6,
+    version: 7,
     seed: opts.seed,
     rng: opts.seed >>> 0,
     nextUid: 1,

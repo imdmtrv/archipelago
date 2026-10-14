@@ -122,6 +122,19 @@ export interface GoalsState {
   insuredStorm: boolean;     // пережил ли шторм под действующей страховкой (цель insuredStorm)
 }
 
+// ───────────── Профессии ─────────────
+
+/** Карточка профессии на старте: смотритель маяка, учитель, капитан парома, врач. */
+export type ProfessionId = 'keeper' | 'teacher' | 'captain' | 'doctor';
+
+export interface ProfessionDef {
+  id: ProfessionId;
+  salary: number;            // зарплата в неделю
+  living: number;            // расходы на жизнь в неделю
+  cash: number;              // монеты на старте
+  loan: number;              // стартовый обычный кредит (у врача — за учёбу); 0 — без долга
+}
+
 // ───────────── Состояние мира ─────────────
 
 export type BotStyle = 'saver' | 'spender' | 'gambler';
@@ -172,6 +185,9 @@ export interface PlayerState {
   threatWeeks: number;       // недель подряд без работы и без свободы («свобода под угрозой»)
   bestLevel: number;         // высший достигнутый уровень свободы (0 — ещё нет, 1..FREEDOM_LEVELS.length)
   dream: DreamState | null;  // у соседей-ботов мечты нет
+  profession: ProfessionId;
+  layoffWeeks: number;       // сколько недель ещё без зарплаты из-за сокращения (0 — работает как обычно)
+  lastLayoffWeek: number;    // неделя последнего сокращения (0 — не было)
   choice: PendingChoice | null; // нерешённая развилка; у ботов всегда null
   lastChoiceWeek: number;    // неделя последней развилки (0 — ещё не было)
   lent: LentLoan[];          // одолжено соседям
@@ -247,7 +263,7 @@ export interface WeekReport {
 }
 
 export interface WorldState {
-  version: 6;
+  version: 7;
   seed: number;
   rng: number;               // текущее состояние ГПСЧ — вся случайность только через него
   nextUid: number;

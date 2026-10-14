@@ -158,6 +158,12 @@ export const en: Dict = {
       upgrades: [],
     },
   },
+  professions: {
+    keeper: { title: 'TODO', text: 'TODO' },
+    teacher: { title: 'TODO', text: 'TODO' },
+    captain: { title: 'TODO', text: 'TODO' },
+    doctor: { title: 'TODO', text: 'TODO' },
+  },
   dream: {
     title: 'Round-the-world schooner',
     description:
@@ -191,6 +197,7 @@ export const en: Dict = {
     coinGenitive: { one: 'coin', few: 'coins', many: 'coins', other: 'coins' },
   },
   news: {
+    layoff: (name) => `TODO ${name}`,
     bought: (name, _female, asset) => `${name} bought ${asset}`,
     sold: (name, _female, asset) => `${name} sold ${asset}`,
     upgraded: (name, _female, before, after) => `${name} upgraded ${before} — now ${after}`,
@@ -393,6 +400,12 @@ export const en: Dict = {
       title: 'Insurance is active',
       text: 'Your insurance is now in effect: storms and illness will no longer hit your wallet.',
     },
+    layoff: {
+      title: 'TODO',
+      reason: { keeper: 'TODO', teacher: 'TODO', captain: 'TODO', doctor: 'TODO' },
+      text: (reason, weeks) => `TODO ${reason} ${weeks}`,
+    },
+    layoffOver: { title: 'TODO', text: 'TODO' },
   },
   ui: {
     perWeek: '/wk',
@@ -477,6 +490,13 @@ export const en: Dict = {
     audioCatalog: 'Choose recording or synth →',
     audioCredits: 'Sound credits and licenses ↗',
     welcome: {
+      profession: 'TODO',
+      professionHint: 'TODO',
+      professionSalary: (coins) => `TODO ${coins}`,
+      professionLiving: (coins) => `TODO ${coins}`,
+      professionCash: (coins) => `TODO ${coins}`,
+      professionLoan: (coins) => `TODO ${coins}`,
+      professionChallenge: (profession) => `TODO ${profession}`,
       lead: 'You have a small island, a job and 600 coins. Your neighbors start with the same.',
       asset: 'Assets',
       assetRule: 'bring in money every week — even when you are not working.',
@@ -541,6 +561,7 @@ export const en: Dict = {
       liabilities: 'Liabilities — take money from your pocket',
     },
     report: {
+      layoff: (weeks) => `TODO ${weeks}`,
       toFreedom: 'To financial freedom',
       covered: 'Expenses covered! Freedom counts if income',
       hold: 'holds through the end of the week',
