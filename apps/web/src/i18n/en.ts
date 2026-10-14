@@ -412,6 +412,12 @@ export const en: Dict = {
       failed: 'Could not share',
       button: 'Share result',
     },
+    feedbackPrompt: {
+      title: 'Enjoying the game?',
+      text: 'Tell us what you liked and what was confusing — it takes a minute and really helps make the game better.',
+      open: 'Answer ↗',
+      later: 'Later',
+    },
     coach: {
       steps: [
         'Buy your first asset — it will bring in money every week.',
