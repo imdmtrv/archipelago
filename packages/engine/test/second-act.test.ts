@@ -819,6 +819,7 @@ describe('случайные действия: инварианты', () => {
       case 'setInsurance': return { type, playerId: 'p1', on: rng.chance(0.5) };
       case 'setExtraShift': return { type, playerId: 'p1', on: rng.chance(0.5) };
       case 'endWeek': return { type };
+      case 'resolveChoice': return { type, playerId: 'p1', accept: rng.chance(0.5) };
       default: return { type, playerId: 'p1' };
     }
   }

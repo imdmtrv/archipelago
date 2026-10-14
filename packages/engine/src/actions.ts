@@ -202,9 +202,12 @@ const buildDream: Handler<Extract<PlayerAction, { type: 'buildDream' }>> = (_wor
   return null;
 };
 
+// TODO(движок): принять или отклонить развилку по docs/specs/engagement-1.md. Пока развилок не бывает.
+const resolveChoice: Handler<Extract<PlayerAction, { type: 'resolveChoice' }>> = () => ({ code: 'noChoice' });
+
 const HANDLERS: { [T in PlayerAction['type']]: Handler<Extract<PlayerAction, { type: T }>> } = {
   buyOffer, sellAsset, repairAsset, upgradeAsset, takeLoan, repayLoan, setInsurance, setExtraShift, study, rest,
-  quitJob, returnToWork, buildDream,
+  quitJob, returnToWork, buildDream, resolveChoice,
 };
 
 export function applyPlayerAction(input: WorldState, action: PlayerAction): ActionResult {
