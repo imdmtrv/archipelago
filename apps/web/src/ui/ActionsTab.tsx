@@ -1,6 +1,6 @@
 import {
-  financeView, getPlayer, insurancePremium, loanLimit, studyCost,
-  EMERGENCY_RATE, LOAN_RATE, REST_COST, REST_JOY, THREAT_WEEKS,
+  financeView, getPlayer, insuranceActive, insurancePremium, loanLimit, studyCost,
+  EMERGENCY_RATE, LOAN_RATE, REST_COST, REST_JOY, THREAT_WEEKS, INSURANCE_WAIT_WEEKS,
 } from '@arch/engine';
 import { HUMAN, useGame } from '../store';
 import { ConfirmButton, Pips, Section } from './common';
@@ -143,6 +143,11 @@ export function ActionsTab() {
             onChange={(e) => act({ type: 'setInsurance', playerId: HUMAN, on: e.target.checked })}
           />
         </label>
+        {/* Публичный API пока не экспортирует срок ожидания; четыре недели заданы контрактом. */}
+        <p className="hint-text">{t.ui.actions.insuranceWait(weeks(INSURANCE_WAIT_WEEKS))}</p>
+        {me.insured && me.insuranceFrom !== null && !insuranceActive(me, world.week) && (
+          <p className="hint-text insurance-pending">{t.ui.actions.insurancePending(me.insuranceFrom)}</p>
+        )}
       </Section>
 
       <Section title={t.ui.actions.bank}>

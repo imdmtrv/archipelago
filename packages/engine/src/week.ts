@@ -1,5 +1,8 @@
 // Подсчёт итогов недели (шаги 2–8 из endWeek). Работает на уже скопированном мире.
 import { addLoan, returnToJob } from './actions';
+import { generateChoice, settleLent } from './choices';
+import { insuranceActive } from './engagement';
+import { settleGoals } from './goals';
 import {
   clamp, currentIncome, DREAM_UPKEEP_UID, dreamUpkeep, dreamWorkPerWeek, freedomLevel, getDream,
   insurancePremium, isFree, loanInterest, realFreedomRatio,
@@ -44,8 +47,13 @@ function settlePlayer(world: WorldState, player: PlayerState, rng: Rng): PlayerW
   const insurance = player.insured ? insurancePremium(player) : 0;
 
   // Повышение меняет зарплату/расходы со следующей недели — уже после начислений выше.
-  const personal = rollPersonalEvent(player, rng);
+  // Бросок личного события использует покрытие этой недели; оформление уже стоит премию.
+  const eventPlayer = { ...player, insured: insuranceActive(player, week) };
+  const personal = rollPersonalEvent(eventPlayer, rng);
+  player.salary = eventPlayer.salary;
+  player.living = eventPlayer.living;
   if (personal) events.push(personal);
+  if (player.insured && week === player.insuranceFrom) events.push({ id: 'insuranceStarted', tone: 'good', params: {} });
   const eventsCash = events.reduce((sum, e) => sum + (e.cashDelta ?? 0), 0);
 
   const net = salary
@@ -177,17 +185,23 @@ export function settleWeek(world: WorldState, news: NewsItem[]): WorldState {
   const rng = new Rng(world.rng);
   const endedWeek = world.week;
   const snapshot = snapshotMarket(world.market);
+  for (const player of world.players) {
+    if (player.choice && player.choice.week <= endedWeek) player.choice = null;
+  }
 
   const reports: Record<string, PlayerWeekReport> = {};
   for (const player of world.players) reports[player.id] = settlePlayer(world, player, rng);
 
   const worldEvents = rollWorldEvent(world, rng, reports);
   collapseScams(world, reports, news);
+  settleLent(world, reports);
   coverNegativeCash(world, reports, news);
   progressDreams(world, reports, news);
   checkFreedom(world, reports, news);
   updateLevels(world, reports);
   checkThreat(world, reports);
+  for (const player of world.players) settleGoals(world, player, reports[player.id]);
+  for (const player of world.players) generateChoice(world, player, rng);
   for (const player of world.players) reports[player.id].cashAfter = player.cash;
 
   world.week = endedWeek + 1;

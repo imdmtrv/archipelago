@@ -68,6 +68,55 @@ export interface DreamState {
   doneWeek: number | null;   // неделя, когда мечта готова целиком
 }
 
+// ───────────── Слухи, развилки, цели ─────────────
+
+/** Общие события недели. Они планируются заранее, и о них идут слухи. */
+export type WorldEventKind = 'storm' | 'fishShoal' | 'touristBoom' | 'crisis';
+
+/** Запланированное общее событие. Скрытая правда: UI показывает игроку только слух (`rumorViews`). */
+export interface UpcomingEvent {
+  kind: WorldEventKind;
+  week: number;              // в конце какой недели событие случится
+  windowStart: number;       // слух называет недели windowStart и windowStart + 1; `week` — одна из них
+  announcedWeek: number;     // в конце какой недели пошёл слух
+}
+
+export type ChoiceKind = 'neighborLoan' | 'promotion' | 'buyer';
+
+/** Развилка: выпадает в конце недели, игрок решает её в течение следующей недели `week`. */
+export interface PendingChoice {
+  uid: string;
+  kind: ChoiceKind;
+  week: number;
+  /** neighborLoan: neighborId, amount; promotion: salary, living; buyer: assetUid, offer. */
+  params: Record<string, EventParam>;
+}
+
+/** Монеты, которые игрок одолжил соседу. */
+export interface LentLoan {
+  uid: string;
+  neighborId: string;
+  amount: number;            // сколько одолжил
+  dueWeek: number;           // в конце какой недели сосед попробует вернуть
+  tries: number;             // сколько раз уже пытался
+}
+
+export interface GoalReward { cash: number; joy: number }
+
+/** Цель на несколько недель. Порядок в GOALS — порядок выдачи. Без сроков: цель ждёт, сколько нужно. */
+export interface GoalDef {
+  id: string;
+  reward: GoalReward;
+}
+
+export interface GoalsState {
+  active: string[];          // id целей из GOALS, не больше GOALS_ACTIVE
+  done: { id: string; week: number }[];
+  calmWeeks: number;         // недель подряд без займа у ростовщика (цель noLoanShark)
+  hadLoan: boolean;          // брал ли обычный кредит (цель debtFree выдаётся только после этого)
+  insuredStorm: boolean;     // пережил ли шторм под действующей страховкой (цель insuredStorm)
+}
+
 // ───────────── Состояние мира ─────────────
 
 export type BotStyle = 'saver' | 'spender' | 'gambler';
@@ -109,6 +158,8 @@ export interface PlayerState {
   restedThisWeek: boolean;
   extraShift: boolean;
   insured: boolean;          // постоянная настройка, премия списывается каждую неделю
+  /** С какой недели страховка действует: её оформляют заранее (INSURANCE_WAIT_WEEKS); null — не застрахован. */
+  insuranceFrom: number | null;
   loans: Loan[];
   owned: OwnedAsset[];
   freedomWeek: number | null; // неделя, когда впервые достигнута свобода
@@ -116,6 +167,11 @@ export interface PlayerState {
   threatWeeks: number;       // недель подряд без работы и без свободы («свобода под угрозой»)
   bestLevel: number;         // высший достигнутый уровень свободы (0 — ещё нет, 1..FREEDOM_LEVELS.length)
   dream: DreamState | null;  // у соседей-ботов мечты нет
+  choice: PendingChoice | null; // нерешённая развилка; у ботов всегда null
+  lastChoiceWeek: number;    // неделя последней развилки (0 — ещё не было)
+  promotions: number;        // сколько раз принято повышение с переездом (не больше PROMOTION_MAX)
+  lent: LentLoan[];          // одолжено соседям
+  goals: GoalsState | null;  // у ботов null
 }
 
 export interface MarketState {
@@ -187,7 +243,7 @@ export interface WeekReport {
 }
 
 export interface WorldState {
-  version: 4;
+  version: 5;
   seed: number;
   rng: number;               // текущее состояние ГПСЧ — вся случайность только через него
   nextUid: number;
@@ -195,6 +251,8 @@ export interface WorldState {
   market: MarketState;
   players: PlayerState[];    // players[0] — человек
   offers: Offer[];
+  /** Запланированные общие события (не больше одного на неделю). */
+  upcoming: UpcomingEvent[];
   lastReport: WeekReport | null;
 }
 
@@ -214,6 +272,7 @@ export type Action =
   | { type: 'quitJob'; playerId: string }
   | { type: 'returnToWork'; playerId: string }
   | { type: 'buildDream'; playerId: string }
+  | { type: 'resolveChoice'; playerId: string; accept: boolean }
   | { type: 'endWeek' };
 
 export interface ActionResult {
@@ -228,7 +287,7 @@ export const ERROR_CODES = {
   restedThisWeek: 'restedThisWeek', restDuringShift: 'restDuringShift', shiftAfterRest: 'shiftAfterRest',
   quitBeforeFreedom: 'quitBeforeFreedom', alreadyQuit: 'alreadyQuit', alreadyEmployed: 'alreadyEmployed',
   shiftUnemployed: 'shiftUnemployed', noDream: 'noDream', dreamBeforeFreedom: 'dreamBeforeFreedom',
-  dreamBusy: 'dreamBusy', dreamDone: 'dreamDone',
+  dreamBusy: 'dreamBusy', dreamDone: 'dreamDone', noChoice: 'noChoice',
 } as const;
 
 export type EngineError =
@@ -331,4 +390,49 @@ export interface LeaderboardRow {
   freedomRatio: number;
   netWorth: number;
   freedomWeek: number | null;
+}
+
+// ───────────── Развилки, цели, слухи для UI ─────────────
+
+export type ChoiceView =
+  | {
+    kind: 'neighborLoan'; uid: string; neighborId: string;
+    amount: number;          // сколько просит
+    returnAmount: number;    // сколько обещает вернуть (с благодарностью)
+    canAccept: boolean;
+    reason?: EngineError;    // почему нельзя одолжить (не хватает монет)
+  }
+  | {
+    kind: 'promotion'; uid: string;
+    salaryIncrease: number; livingIncrease: number;
+    netChange: number;       // salaryIncrease − livingIncrease
+    freedomBefore: number; freedomAfter: number; // как FinanceView.freedomRatio
+  }
+  | {
+    kind: 'buyer'; uid: string; assetUid: string; defId: string; level: number;
+    offer: number;           // сколько предлагает покупатель
+    saleValue: number;       // сколько дали бы при обычной продаже
+    weeklyIncome: number;    // сколько актив приносит сейчас
+    freedomBefore: number; freedomAfter: number;
+  };
+
+export interface RumorView {
+  kind: WorldEventKind;
+  fromWeek: number;          // слух называет недели fromWeek..toWeek
+  toWeek: number;
+  /** Точная неделя — тем, у кого хватает знаний (RUMOR_EXACT_KNOWLEDGE); иначе null. */
+  exactWeek: number | null;
+}
+
+export interface GoalView {
+  id: string;
+  value: number;             // текущий прогресс в единицах цели
+  target: number;
+  reward: GoalReward;
+}
+
+export interface GoalsView {
+  active: GoalView[];
+  done: { id: string; week: number }[];
+  total: number;             // сколько целей всего в GOALS
 }

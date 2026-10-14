@@ -228,6 +228,7 @@ export const en: Dict = {
     dreamBeforeFreedom: 'You can build your dream after financial freedom',
     dreamBusy: 'This stage is still being built',
     dreamDone: 'Your dream is already complete',
+    noChoice: 'There is nothing to decide right now',
     notEnoughCash: (_n, coins) => `You need ${coins} more`,
     needKnowledge: (n) => `Knowledge ${n} needed`,
     loanOverLimit: (_n, coins) => `The bank will lend at most ${coins}`,
@@ -341,6 +342,40 @@ export const en: Dict = {
       title: 'Back to work',
       text: (coins) =>
         `Freedom did not hold: income stayed too low for too long. Your new salary is ${coins} a week, a little lower than before. Build a buffer and freedom can return.`,
+    },
+    rumor: {
+      title: 'Rumor',
+      storm: (when) =>
+        `Old fishermen say a storm is coming ${when} — boats and bungalows could take a beating. Insurance does not start right away: arrange it in advance.`,
+      fishShoal: (when) =>
+        `Whispers around the harbor say a huge fish shoal will arrive ${when}. Fishing ventures will earn more.`,
+      touristBoom: (when) =>
+        `The ferry company boasts it will bring crowds of tourists ${when}. Bungalows and cafés are in for a good season.`,
+      crisis: (when) =>
+        `Traders look grim: a downturn will hit ${when}. Tourists will stay home, fish prices will fall, and property will be hard to sell at a good price.`,
+    },
+    goalDone: {
+      title: (goal) => `Goal complete: ${goal}`,
+      text: (reward) => `Reward: ${reward}. A new goal is already waiting on the list.`,
+    },
+    neighborLoanReturned: {
+      title: (name) => `${name}: loan repaid`,
+      text: (name, _female, coins) =>
+        `${name} repaid the loan with thanks: ${coins}. Lending to someone who manages money well is safe.`,
+    },
+    neighborLoanLate: {
+      title: (name) => `${name} asks for more time`,
+      text: (name) =>
+        `${name} could not repay the loan yet, but promises to return it in a couple of weeks.`,
+    },
+    neighborLoanLost: {
+      title: (name) => `${name} will not repay the debt`,
+      text: (name, _female, coins) =>
+        `${name} was never able to settle the debt: ${coins} will not be coming back. Only lend what you are ready to part with.`,
+    },
+    insuranceStarted: {
+      title: 'Insurance is active',
+      text: 'Your insurance is now in effect: storms and illness will no longer hit your wallet.',
     },
   },
   ui: {
@@ -588,6 +623,8 @@ export const en: Dict = {
       insurance: 'Insurance',
       insure: 'Insure property and health',
       insureText: (premium) => `−${premium} a week. Covers storm repairs and treatment`,
+      insurancePending: (week) => `Takes effect in week ${week}`,
+      insuranceWait: (weeks) => `Insurance is arranged in advance: it takes effect after ${weeks}.`,
       bank: 'Archipelago bank',
       bankText: (loan, emergency) =>
         `A loan helps you buy an asset sooner, but costs ${loan} of the debt each week. If cash drops below zero, a loan shark lends at ${emergency} a week.`,
@@ -652,5 +689,76 @@ export const en: Dict = {
     shareEpilogue: (freedom, dream) =>
       `Archipelago: freedom in ${freedom}, round-the-world schooner in ${dream} 🏝 Can you do it faster?`,
     store: { perWeek: 'a week', weekToast: (week, net, cash) => `Week ${week}: ${net} · cash ${cash}` },
+    choices: {
+      kicker: 'Crossroads',
+      pending: 'Make your choice first',
+      freedom: (before, after) => `Freedom: ${before}% → ${after}%`,
+      neighborLoan: {
+        amount: 'Loan amount',
+        back: (coins) => `Will repay ${coins} if things go well`,
+        viewNeighbor: "View neighbor's card",
+        title: (name) => `${name} asks for a loan`,
+        text: (name, _female, coins, back) =>
+          `${name} is in a tight spot and asks for ${coins}. Promises to return ${back} in a few weeks — if things go well.`,
+        hint: 'Check the neighbor’s card: how do they handle money? Only lend what you are ready to part with.',
+        accept: (coins) => `Lend ${coins}`,
+        decline: 'Politely decline',
+        lent: (name, coins) => `${name}: lent ${coins}`,
+      },
+      promotion: {
+        title: 'Promotion with relocation',
+        text: (salary, living) =>
+          `The co-op offers a position in the big harbor: salary goes up by ${salary} a week, but living there costs ${living} more.`,
+        net: (coins) => `Keep ${coins} more each week`,
+        hint: 'Freedom is when passive income covers expenses. The higher your expenses, the farther the finish line.',
+        accept: 'Move',
+        decline: 'Stay',
+        done: 'You moved: salary and expenses went up',
+      },
+      buyer: {
+        title: (asset) => `Buyer for ${asset}`,
+        text: (asset, offer, sale) =>
+          `A visitor wants to buy ${asset} for ${offer}. Selling it normally would bring ${sale}.`,
+        income: (coins) => `Currently earns ${coins} a week`,
+        hint: 'Cash upfront or income every week? A sold asset no longer works for you.',
+        accept: (coins) => `Sell for ${coins}`,
+        decline: 'Keep it',
+        sold: (asset, coins) => `Sold ${asset} for ${coins}`,
+      },
+      declined: 'Decided: everything stays as it is',
+    },
+    goals: {
+      title: 'Goals',
+      progress: (value, target) => `${value} / ${target}`,
+      reward: (parts) => `Reward: ${parts}`,
+      joy: (n) => `+${n} happiness`,
+      done: (n, total) => `${n} of ${total} completed`,
+      allDone: 'All goals completed — the island is proud of you!',
+      items: {
+        study: { title: 'First lessons', text: 'Take a course: knowledge unlocks new deals and helps spot scams.' },
+        cushion: { title: 'Safety buffer', text: 'Keep three weeks of expenses in cash — in case of illness or a breakdown.' },
+        sectors: { title: 'Three baskets', text: "Income-producing assets in fish, tourism and steady income: don't put all your eggs in one basket." },
+        passive100: { title: 'A hundred a week', text: 'Passive income of 100 coins a week: money works while you are busy with other things.' },
+        upgrade: { title: 'Invest in what you have', text: 'Upgrade any asset: investing in what already works is a great path too.' },
+        noLoanShark: { title: 'No loan sharks', text: 'Fifteen weeks in a row without borrowing from a loan shark: keep a buffer.' },
+        share30: { title: 'A third from assets', text: 'Let assets bring in a third of all your income instead of salary.' },
+        halfway: { title: 'Halfway there', text: 'Passive income covers half of your expenses.' },
+        insuredStorm: { title: 'Protected', text: 'Weather a storm with active insurance. It has to be arranged in advance.' },
+        debtFree: { title: 'Debt-free', text: 'Pay off all loans: interest no longer eats into your income.' },
+        level150: { title: 'Confidence', text: 'Passive income is one and a half times expenses: your freedom has a safety margin.' },
+      },
+    },
+    rumors: {
+      title: 'Rumors',
+      kinds: { storm: 'Storm', fishShoal: 'Fish shoal', touristBoom: 'Tourist boom', crisis: 'Downturn' },
+      when: {
+        range: (from, to) => `in ${from}–${to} weeks`,
+        thisOrNext: 'this week or next',
+        thisWeek: 'this week',
+        exact: (week) => `in week ${week}`,
+      },
+      chip: (kind, when) => `${kind} ${when}`,
+      exactHint: 'Knowledge helps: you know the exact week.',
+    },
   },
 };

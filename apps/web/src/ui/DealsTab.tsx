@@ -1,6 +1,6 @@
-import { financeView, getPlayer, offerViews, type OfferView } from '@arch/engine';
+import { financeView, getPlayer, offerViews, rumorViews, type OfferView } from '@arch/engine';
 import { HUMAN, useGame } from '../store';
-import { assetCopy, marketLine, scamWarning, sectorName, useI18n } from '../i18n';
+import { assetCopy, marketLine, rumorWhen, scamWarning, sectorName, useI18n } from '../i18n';
 import { FreedomLine } from './common';
 
 function OfferCard({ v, cash, freedom }: { v: OfferView; cash: number; freedom: number }) {
@@ -66,12 +66,18 @@ export function DealsTab() {
   const freedom = financeView(world, HUMAN).freedomRatio;
   const fish = marketLine(world.market.fish, 'fish');
   const tourism = marketLine(world.market.tourism, 'tourism');
+  const rumors = rumorViews(world, HUMAN);
 
   return (
     <div className="tab-body">
       <div className="market">
         <span className={`chip ${fish.tone}`}>{fish.text}</span>
         <span className={`chip ${tourism.tone}`}>{tourism.text}</span>
+        {rumors.map((rumor, i) => (
+          <span key={`${rumor.kind}-${rumor.fromWeek}-${i}`} className={`chip rumor-chip ${rumor.kind === 'storm' || rumor.kind === 'crisis' ? 'neg' : 'pos'}`} title={rumor.exactWeek !== null ? t.ui.rumors.exactHint : undefined}>
+            {t.ui.rumors.chip(t.ui.rumors.kinds[rumor.kind], rumorWhen(rumor, world.week))}
+          </span>
+        ))}
       </div>
       {views.length === 0
         ? <div className="empty">{t.ui.deals.empty}</div>

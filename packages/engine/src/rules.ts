@@ -37,6 +37,8 @@ export const EMERGENCY_STEP = 10;           // заём ростовщика о�
 export const INSURANCE_BASE = 5;            // премия = 5 + 1% цены имущества, которое боится штормов
 export const INSURANCE_RATE = 0.01;
 export const REPAIR_SHARE = 0.3;            // ремонт = 30% цены
+/** Страховка начинает действовать через столько недель: её оформляют заранее, а не услышав о шторме. */
+export const INSURANCE_WAIT_WEEKS = 4;
 
 // ───────────── Доска сделок ─────────────
 export const BOARD_SIZE = 4;
@@ -87,3 +89,26 @@ export const TOURISM_MAX = 1.6;
 export const TOURISM_AMPLITUDE = 0.25;
 export const TOURISM_PERIOD = 26;           // недель
 export const SHOCK_DECAY = 0.7;             // всплески затухают ×0.7 в неделю
+
+// ───────────── Слухи ─────────────
+export const RUMOR_LEAD: [number, number] = [2, 4]; // общее событие планируется на 2–4 недели вперёд
+export const RUMOR_EXACT_KNOWLEDGE = 2;     // с этого уровня знаний слух называет точную неделю
+
+// ───────────── Развилки (только у человека) ─────────────
+export const CHOICE_CHANCE = 0.3;           // шанс развилки в конце недели…
+export const CHOICE_COOLDOWN = 3;           // …не раньше чем через 3 недели после прошлой
+export const CHOICE_WEIGHTS = { neighborLoan: 0.4, promotion: 0.25, buyer: 0.35 } as const;
+export const NEIGHBOR_LOAN_ASK: [number, number] = [200, 350]; // сосед просит, округляется до 10
+export const NEIGHBOR_LOAN_BONUS = 0.1;     // возвращает с благодарностью +10%
+export const NEIGHBOR_LOAN_DUE: [number, number] = [4, 8];     // через столько недель пробует вернуть
+export const NEIGHBOR_LOAN_RETRY = 2;       // не смог — пробует снова через 2 недели…
+export const NEIGHBOR_LOAN_TRIES = 3;       // …всего 3 попытки, потом долг пропадает
+export const NEIGHBOR_LOAN_JOY = 4;         // помочь соседу приятно
+export const PROMOTION_SALARY = 40;         // повышение с переездом: +40 к зарплате…
+export const PROMOTION_LIVING = 35;         // …и +35 к расходам — финиш свободы отодвигается
+export const PROMOTION_JOY = -3;            // переезд утомляет
+export const PROMOTION_MAX = 2;             // не больше двух за партию
+export const BUYER_PREMIUM: [number, number] = [1.2, 1.45]; // покупатель предлагает 120–145% уплаченной цены
+
+// ───────────── Цели ─────────────
+export const GOALS_ACTIVE = 3;              // столько целей видно одновременно

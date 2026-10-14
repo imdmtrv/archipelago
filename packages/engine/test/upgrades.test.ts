@@ -238,6 +238,7 @@ describe('после улучшения', () => {
 
   it('шторм называет объект по уровню', () => {
     const world = richWorld();
+    world.upcoming = [{ kind: 'storm', week: world.week, windowStart: world.week, announcedWeek: world.week - 2 }];
     giveAsset(world, 'p1', 'boat', { level: 3 });
     const report: PlayerWeekReport = {
       playerId: 'p1', salary: 0, assetIncome: [], upkeep: [], living: 0, interest: 0, insurance: 0,
@@ -502,7 +503,7 @@ describe('миграция: версия 3', () => {
     const snapshot = JSON.stringify(raw);
     const world = migrateWorld(raw)!;
     expect(world).not.toBeNull();
-    expect(world.version).toBe(4);
+    expect(world.version).toBe(5);
     expect(JSON.stringify(raw)).toBe(snapshot);
     const owned = world.players.flatMap((p) => p.owned);
     expect(owned).toHaveLength(ownedOf(raw).length);
@@ -531,7 +532,7 @@ describe('миграция: версия 3', () => {
     }
     const world = migrateWorld(raw)!;
     expect(world).not.toBeNull();
-    expect(world.version).toBe(4);
+    expect(world.version).toBe(5);
     expect(world.players[0].dream).toMatchObject({ id: 'schooner', built: 0 });
     expect(world.players.flatMap((p) => p.owned).every((a) => a.level === 1)).toBe(true);
     expect(JSON.stringify(ok(migrateWorld(raw)!, { type: 'endWeek' }))).toBe(JSON.stringify(ok(world, { type: 'endWeek' })));

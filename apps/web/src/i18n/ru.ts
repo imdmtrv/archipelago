@@ -227,6 +227,7 @@ export const ru = {
     dreamBeforeFreedom: 'Строить мечту можно после финансовой свободы',
     dreamBusy: 'Этот этап ещё строится',
     dreamDone: 'Мечта уже готова',
+    noChoice: 'Сейчас нечего решать',
     notEnoughCash: (_n: number, coins: string) => `Не хватает ${coins}`,
     needKnowledge: (n: number) => `Нужно знание ${n}`,
     loanOverLimit: (_n: number, coins: string) => `Банк даёт не больше ${coins}`,
@@ -339,6 +340,40 @@ export const ru = {
       title: 'Пришлось вернуться на работу',
       text: (coins: string) =>
         `Свобода не удержалась: без работы доходов не хватало слишком долго. Новая зарплата — ${coins} в неделю, чуть меньше прежней. Копите запас, и свобода вернётся.`,
+    },
+    rumor: {
+      title: 'Слух',
+      storm: (when: string) =>
+        `Старые рыбаки говорят, что ${when} придёт шторм: лодкам и бунгало может достаться. Страховка начинает действовать не сразу — её оформляют заранее.`,
+      fishShoal: (when: string) =>
+        `В порту шепчутся, что ${when} к архипелагу подойдёт большой косяк рыбы. Рыбацкие дела заработают больше.`,
+      touristBoom: (when: string) =>
+        `Пароходная компания хвалится, что ${when} повезёт к нам толпы туристов. Бунгало и кафе ждёт хороший сезон.`,
+      crisis: (when: string) =>
+        `Торговцы хмурятся: ${when} начнётся кризис. Туристов станет меньше, рыба подешевеет, а продать имущество дорого не выйдет.`,
+    },
+    goalDone: {
+      title: (goal: string) => `Цель выполнена: ${goal}`,
+      text: (reward: string) => `Награда — ${reward}. Новая цель уже ждёт в списке.`,
+    },
+    neighborLoanReturned: {
+      title: (name: string) => `${name}: долг возвращён`,
+      text: (name: string, female: boolean, coins: string) =>
+        `${name} ${female ? 'вернула' : 'вернул'} долг с благодарностью: ${coins}. Одалживать тем, кто умеет обращаться с деньгами, не страшно.`,
+    },
+    neighborLoanLate: {
+      title: (name: string) => `${name} просит подождать`,
+      text: (name: string, female: boolean) =>
+        `${name} пока не ${female ? 'смогла' : 'смог'} вернуть долг и обещает отдать через пару недель.`,
+    },
+    neighborLoanLost: {
+      title: (name: string) => `${name} не вернёт долг`,
+      text: (name: string, female: boolean, coins: string) =>
+        `${name} так и не ${female ? 'смогла' : 'смог'} расплатиться: ${coins} уже не вернуть. В долг дают только то, с чем готовы расстаться.`,
+    },
+    insuranceStarted: {
+      title: 'Страховка действует',
+      text: 'Страховка вступила в силу: теперь шторм и болезнь не ударят по карману.',
     },
   },
   ui: {
@@ -586,6 +621,8 @@ export const ru = {
       insurance: 'Страховка',
       insure: 'Страховать имущество и здоровье',
       insureText: (premium: string) => `−${premium} в неделю. Оплатит ремонт после шторма и лечение`,
+      insurancePending: (week: number) => `Начнёт действовать с ${week}-й недели`,
+      insuranceWait: (weeks: string) => `Страховку оформляют заранее: она начинает действовать через ${weeks}.`,
       bank: 'Банк архипелага',
       bankText: (loan: string, emergency: string) =>
         `Кредит помогает купить актив раньше, но каждую неделю нужно платить ${loan} от долга. Если наличные уйдут в минус, придётся занять у ростовщика под ${emergency} в неделю.`,
@@ -651,6 +688,77 @@ export const ru = {
     store: {
       perWeek: 'в неделю',
       weekToast: (week: number, net: string, cash: string) => `Неделя ${week}: ${net} · наличные ${cash}`,
+    },
+    choices: {
+      kicker: 'Развилка',
+      pending: 'Сначала решите развилку',
+      freedom: (before: number, after: number) => `Свобода: ${before}% → ${after}%`,
+      neighborLoan: {
+        amount: 'Сумма займа',
+        back: (coins: string) => `Вернёт ${coins}, если дела пойдут`,
+        viewNeighbor: 'Посмотреть карточку соседа',
+        title: (name: string) => `${name} просит в долг`,
+        text: (name: string, female: boolean, coins: string, back: string) =>
+          `${name} ${female ? 'попала' : 'попал'} в трудное положение и просит ${coins}. Обещает вернуть ${back} через несколько недель — если дела пойдут.`,
+        hint: 'Загляните в карточку соседа: как он обращается с деньгами? В долг дают только то, с чем готовы расстаться.',
+        accept: (coins: string) => `Одолжить ${coins}`,
+        decline: 'Вежливо отказать',
+        lent: (name: string, coins: string) => `${name}: одолжено ${coins}`,
+      },
+      promotion: {
+        title: 'Повышение с переездом',
+        text: (salary: string, living: string) =>
+          `Артель зовёт на должность в большой порт: зарплата больше на ${salary} в неделю, но жизнь там дороже на ${living}.`,
+        net: (coins: string) => `В неделю останется больше на ${coins}`,
+        hint: 'Свобода — когда пассивный доход покрывает расходы. Чем больше расходы, тем дальше финиш.',
+        accept: 'Переехать',
+        decline: 'Остаться',
+        done: 'Вы переехали: зарплата и расходы выросли',
+      },
+      buyer: {
+        title: (asset: string) => `Покупатель на ${asset}`,
+        text: (asset: string, offer: string, sale: string) =>
+          `Приезжий хочет купить ${asset} за ${offer}. Обычная продажа дала бы ${sale}.`,
+        income: (coins: string) => `Сейчас приносит ${coins} в неделю`,
+        hint: 'Деньги сразу или доход каждую неделю? Проданный актив больше не работает на вас.',
+        accept: (coins: string) => `Продать за ${coins}`,
+        decline: 'Оставить себе',
+        sold: (asset: string, coins: string) => `Продано: ${asset} за ${coins}`,
+      },
+      declined: 'Решено: всё остаётся как есть',
+    },
+    goals: {
+      title: 'Цели',
+      progress: (value: string, target: string) => `${value} из ${target}`,
+      reward: (parts: string) => `Награда: ${parts}`,
+      joy: (n: number) => `+${n} к счастью`,
+      done: (n: number, total: number) => `Выполнено ${n} из ${total}`,
+      allDone: 'Все цели выполнены — остров гордится вами!',
+      items: {
+        study: { title: 'Первые знания', text: 'Пройдите курс: знания открывают новые сделки и помогают узнать аферу.' },
+        cushion: { title: 'Подушка безопасности', text: 'Держите наличными расходы на три недели — на случай болезни или поломки.' },
+        sectors: { title: 'Три корзины', text: 'Доходные активы в рыбе, туризме и стабильном доходе: не все яйца в одной корзине.' },
+        passive100: { title: 'Сотня в неделю', text: 'Пассивный доход 100 монет в неделю: деньги работают, пока вы заняты другим.' },
+        upgrade: { title: 'Вложить в своё', text: 'Улучшите любой актив: вкладывать в то, что уже работает, — тоже путь.' },
+        noLoanShark: { title: 'Без ростовщика', text: 'Пятнадцать недель подряд не занимать у ростовщика: держите запас.' },
+        share30: { title: 'Треть от активов', text: 'Пусть треть всех доходов приносят активы, а не зарплата.' },
+        halfway: { title: 'Полпути', text: 'Пассивный доход покрывает половину расходов.' },
+        insuredStorm: { title: 'Под защитой', text: 'Переживите шторм с действующей страховкой. Её оформляют заранее.' },
+        debtFree: { title: 'Без долгов', text: 'Закройте все кредиты: проценты больше не съедают доход.' },
+        level150: { title: 'Уверенность', text: 'Пассивный доход в полтора раза больше расходов: у свободы есть запас.' },
+      },
+    },
+    rumors: {
+      title: 'Слухи',
+      kinds: { storm: 'Шторм', fishShoal: 'Косяк рыбы', touristBoom: 'Наплыв туристов', crisis: 'Кризис' },
+      when: {
+        range: (from: number, to: number) => `через ${from}–${to} ${to >= 5 ? 'недель' : 'недели'}`,
+        thisOrNext: 'на этой или следующей неделе',
+        thisWeek: 'на этой неделе',
+        exact: (week: number) => `на ${week}-й неделе`,
+      },
+      chip: (kind: string, when: string) => `${kind} ${when}`,
+      exactHint: 'Знания помогают: вы знаете точную неделю.',
     },
   },
 };

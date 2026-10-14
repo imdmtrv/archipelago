@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  applyAction, assetViews, createWorld, financeView, getPlayer, migrateWorld, ASSET_DEFS, DREAMS, DREAM_UPKEEP_UID,
+  applyAction, assetViews, choiceView, createWorld, financeView, getPlayer, migrateWorld, ASSET_DEFS, DREAMS, DREAM_UPKEEP_UID,
   type Action, type GameEvent, type WeekNewsItem, type WeekReport, type WorldState,
 } from '@arch/engine';
 import type { DreamProgress, FloatLabel, PlacedItem, Weather } from './scene/contract';
@@ -10,7 +10,8 @@ import { errorText, getI18n } from './i18n';
 export const HUMAN = 'p1';
 const SAVE_KEY = new URLSearchParams(location.search).has('director') ? 'archipelago.director.save' : 'archipelago.save.v1';
 
-export type Tab = 'deals' | 'island' | 'actions' | 'report';
+/** 'goals' — только на компьютере; на телефоне цели во вкладке «Отчёт». */
+export type Tab = 'deals' | 'island' | 'actions' | 'report' | 'goals';
 
 export interface Toast { id: number; text: string; tone: 'good' | 'bad' | 'neutral' }
 /** `epilogue` — на этой неделе достроена мечта: вместо обычных итогов недели показываем эпилог. */
@@ -69,6 +70,7 @@ interface GameStore {
   weather: Weather;
   toast: Toast | null;
   modal: WeekModal | null;
+  choiceOpen: boolean;
   tab: Tab;
   sheetOpen: boolean;
   highlightUid: string | null;
@@ -79,6 +81,7 @@ interface GameStore {
   act(action: Exclude<Action, { type: 'endWeek' }>, success?: string): boolean;
   endWeek(): void;
   closeModal(): void;
+  closeChoice(): void;
   setTab(tab: Tab): void;
   setSheetOpen(open: boolean): void;
   focusItem(uid: string): void;
@@ -93,6 +96,7 @@ let floatSeq = 0;
 
 export const useGame = create<GameStore>((set, get) => {
   const timers = new Set<ReturnType<typeof setTimeout>>();
+  let choicePromptSeq = 0;
   const schedule = (callback: () => void, delay: number) => {
     const timer = setTimeout(() => { timers.delete(timer); callback(); }, delay);
     timers.add(timer);
@@ -118,6 +122,7 @@ export const useGame = create<GameStore>((set, get) => {
     weather: 'clear',
     toast: null,
     modal: null,
+    choiceOpen: false,
     tab: 'deals',
     sheetOpen: false,
     highlightUid: null,
@@ -128,7 +133,7 @@ export const useGame = create<GameStore>((set, get) => {
       if (get().world) stopGameSounds();
       const world = createWorld({ seed: Math.floor(Math.random() * 2 ** 31), playerName, islandName });
       const history = recordHistory({}, world);
-      set({ world, news: [], history, neighborId: null, modal: null, tab: 'deals', floats: [], weather: 'clear', busy: false, toast: null });
+      set({ world, news: [], history, neighborId: null, modal: null, choiceOpen: false, tab: 'deals', floats: [], weather: 'clear', busy: false, toast: null });
       save({ world, news: [], history });
       startGameSounds(world);
     },
@@ -137,7 +142,7 @@ export const useGame = create<GameStore>((set, get) => {
       clearTimers();
       stopGameSounds();
       save(null);
-      set({ world: null, news: [], history: {}, neighborId: null, modal: null, floats: [], weather: 'clear', busy: false, toast: null });
+      set({ world: null, news: [], history: {}, neighborId: null, modal: null, choiceOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
     },
 
     act(action, success) {
@@ -145,11 +150,16 @@ export const useGame = create<GameStore>((set, get) => {
       if (!world) return false;
       const res = applyAction(world, action);
       if (res.error) {
+        // Движок может снять устаревшую развилку даже при ошибке (актив уже продан).
+        if (action.type === 'resolveChoice') {
+          set({ world: res.world, choiceOpen: !!choiceView(res.world, HUMAN) });
+          save({ world: res.world, news: get().news, history: get().history });
+        }
         onAction(action, world, res.world, res.error);
         get().showToast(errorText(res.error), 'bad');
         return false;
       }
-      set({ world: res.world });
+      set({ world: res.world, ...(action.type === 'resolveChoice' ? { choiceOpen: false } : {}) });
       save({ world: res.world, news: get().news, history: get().history });
       onAction(action, world, res.world);
 
@@ -185,8 +195,14 @@ export const useGame = create<GameStore>((set, get) => {
     },
 
     endWeek() {
-      const { world, busy } = get();
-      if (!world || busy) return;
+      const { world, busy, modal } = get();
+      if (!world || busy || modal) return;
+      if (choiceView(world, HUMAN)) {
+        choicePromptSeq++;
+        set({ choiceOpen: true, neighborId: null });
+        get().showToast(getI18n().t.ui.choices.pending);
+        return;
+      }
       const res = applyAction(world, { type: 'endWeek' });
       if (res.error || !res.world.lastReport) {
         if (res.error) get().showToast(errorText(res.error), 'bad');
@@ -237,11 +253,26 @@ export const useGame = create<GameStore>((set, get) => {
           set({ busy: false });
           sounds.onModal(false);
           get().showToast(t.ui.store.weekToast(report.week, signed(mine.net), fmt(mine.cashAfter)), mine.net >= 0 ? 'good' : 'bad');
+          // Сначала игрок читает тост недели; затем — новое решение.
+          const uid = choiceView(res.world, HUMAN)?.uid;
+          const prompt = ++choicePromptSeq;
+          if (uid) schedule(() => {
+            const latest = get();
+            if (prompt === choicePromptSeq && latest.world?.week === res.world.week && choiceView(latest.world, HUMAN)?.uid === uid && !latest.modal && !latest.busy) {
+              set({ choiceOpen: true, neighborId: null });
+            }
+          }, 3200);
         }
       }, events.length > 0 || mine.freedomReached || epilogue || sounds.hasNotice ? 1100 : 500);
     },
 
-    closeModal() { set({ modal: null }); },
+    closeModal() {
+      choicePromptSeq++;
+      const { world } = get();
+      const choiceOpen = !!world && !!choiceView(world, HUMAN);
+      set({ modal: null, choiceOpen, ...(choiceOpen ? { neighborId: null } : {}) });
+    },
+    closeChoice() { choicePromptSeq++; set({ choiceOpen: false }); },
     setTab(tab) { set({ tab, sheetOpen: true }); },
     setSheetOpen(open) { set({ sheetOpen: open }); },
 

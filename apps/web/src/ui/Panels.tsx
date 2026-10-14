@@ -6,6 +6,7 @@ import { DealsTab } from './DealsTab';
 import { IslandTab } from './IslandTab';
 import { ActionsTab } from './ActionsTab';
 import { DreamBlock } from './DreamBlock';
+import { GoalsBlock } from './GoalsBlock';
 import { FreedomBlock, Statement } from './ReportPanel';
 
 export function useMediaQuery(query: string) {
@@ -24,7 +25,8 @@ function TabContent({ tab }: { tab: Tab }) {
     case 'deals': return <DealsTab />;
     case 'island': return <IslandTab />;
     case 'actions': return <ActionsTab />;
-    case 'report': return <div className="tab-body"><FreedomBlock /><DreamBlock /><Statement /></div>;
+    case 'report': return <div className="tab-body"><FreedomBlock /><DreamBlock /><GoalsBlock /><Statement /></div>;
+    case 'goals': return <div className="tab-body"><GoalsBlock /></div>;
   }
 }
 
@@ -39,7 +41,7 @@ function Tabs({ tabs, extra }: { tabs: Tab[]; extra?: ReactNode }) {
     <nav className="tabs" role="tablist">
       {tabs.map((tabName) => (
         <button key={tabName} role="tab" aria-selected={tab === tabName} className={`tab ${tab === tabName ? 'active' : ''}`} onClick={() => setTab(tabName)}>
-          {t.ui.tabs[tabName]}
+          {tabName === 'goals' ? t.ui.goals.title : t.ui.tabs[tabName]}
           {tabName === 'deals' && affordable > 0 && <span className="badge-count">{affordable}</span>}
           {tabName === 'actions' && tired && <span className="badge-count alert" title={t.ui.restHint}>!</span>}
         </button>
@@ -63,7 +65,7 @@ export function NextWeekButton({ compact }: { compact?: boolean }) {
   );
 }
 
-/** Компьютер: отчёт слева, вкладки справа, кнопка хода внизу по центру. */
+/** Компьютер: отчёт слева, вкладки справа (цели — своей вкладкой: в левой колонке им не хватает высоты), кнопка хода внизу по центру. */
 export function DesktopLayout() {
   const tab = useGame((s) => s.tab);
   const current = tab === 'report' ? 'deals' : tab;
@@ -75,7 +77,7 @@ export function DesktopLayout() {
         <div className="panel pad scroll"><Statement /></div>
       </aside>
       <aside className="col-right panel">
-        <Tabs tabs={['deals', 'island', 'actions']} />
+        <Tabs tabs={['deals', 'island', 'actions', 'goals']} />
         <div className="tab-scroll"><TabContent tab={current} /></div>
       </aside>
       <div className="col-center"><NextWeekButton /></div>

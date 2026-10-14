@@ -5,6 +5,7 @@ import { TopBar } from './ui/TopBar';
 import { DesktopLayout, MobileLayout, useMediaQuery } from './ui/Panels';
 import { ToastView, WeekModal, WelcomeModal } from './ui/Modals';
 import { NeighborModal } from './ui/Neighbors';
+import { ChoiceModal } from './ui/ChoiceModal';
 import { useUiSound } from './audio/useUiSound';
 import { Coach } from './ui/GuidedCoach';
 import { initAnalytics } from './analytics';
@@ -68,6 +69,7 @@ export default function App() {
       {!world && <WelcomeModal />}
       {world && isMobile && <NeighborModal />}
       <WeekModal />
+      <ChoiceModal />
       <ToastView />
       <Coach />
     </>

@@ -4,7 +4,8 @@ import {
   getDef, getDream, isSlotFull, realFreedomRatio, studyCost,
 } from '../src/economy';
 import * as R from '../src/rules';
-import { assetViews, dreamView, offerViews } from '../src/selectors';
+import { assetViews, dreamView, financeView, offerViews } from '../src/selectors';
+import { choiceView, rumorViews } from '../src/engagement';
 import type { PlayerState, WorldState } from '../src/types';
 
 /** Улучшение, которое окупается дольше, разумный игрок не делает вовсе. */
@@ -23,6 +24,10 @@ export interface SensibleOptions {
   study?: boolean;
   /** true — никогда не покупать известные движку аферы, даже без знания игрока. */
   avoidScams?: boolean;
+  /** Сравнение уроков развилок и слухов на тех же сидах. */
+  alwaysPromote?: boolean;
+  lendEveryone?: boolean;
+  listenRumors?: boolean;
 }
 
 /**
@@ -40,11 +45,23 @@ function sensibleUpgrade(world: WorldState, me: PlayerState, buffer: number): Pl
   return best ? { type: 'upgradeAsset', playerId: me.id, assetUid: best.uid } : null;
 }
 
-/** Разумный игрок симулятора. Параметры по умолчанию сохраняют прежнее поведение побайтно. */
+/** Разумный игрок симулятора: сначала решает развилку, затем ведёт хозяйство. */
 export function makeSensible({
   beforeBuying, upgradeReserve, upgrades = true, study = true, avoidScams = false,
+  alwaysPromote = false, lendEveryone = false, listenRumors = false,
 }: SensibleOptions = {}): Policy {
   return (world, me) => {
+    if (me.choice) {
+      const view = choiceView(world, me.id);
+      let accept = false;
+      if (view?.kind === 'neighborLoan') {
+        const neighbor = world.players.find((p) => p.id === view.neighborId)!;
+        accept = view.canAccept && (lendEveryone || (!neighbor.loans.some((l) => l.emergency)
+          && financeView(world, neighbor.id).net > 0 && me.cash - view.amount >= 150));
+      } else if (view?.kind === 'promotion') accept = alwaysPromote;
+      else if (view?.kind === 'buyer') accept = view.offer >= 25 * view.weeklyIncome;
+      return { type: 'resolveChoice', playerId: me.id, accept };
+    }
     const buffer = 80;
     const damaged = me.owned.find((a) => a.damaged && me.cash - Math.round(a.price * R.REPAIR_SHARE) >= buffer);
     if (damaged) return { type: 'repairAsset', playerId: me.id, assetUid: damaged.uid };
@@ -64,11 +81,16 @@ export function makeSensible({
     if (extra) return extra;
 
     const views = offerViews(world, me.id);
+    const rumors = listenRumors ? rumorViews(world, me.id) : [];
+    const crisis = rumors.some((r) => r.kind === 'crisis');
+    const preferred = new Set(rumors.flatMap((r) => r.kind === 'fishShoal' ? ['fish'] : r.kind === 'touristBoom' ? ['tourism'] : []));
     const best = views
       .filter((v) => !v.locked && !v.slotFull && !v.warning && v.def.kind !== 'status')
       .filter((v) => !avoidScams || v.def.kind !== 'scam')
+      .filter((v) => !crisis || v.def.sector !== 'tourism')
       .filter((v) => v.paybackWeeks !== null && v.paybackWeeks <= 35 && me.cash - v.offer.price >= buffer)
-      .sort((a, b) => (a.paybackWeeks ?? 0) - (b.paybackWeeks ?? 0))[0];
+      .sort((a, b) => Number(preferred.has(b.def.sector)) - Number(preferred.has(a.def.sector))
+        || (a.paybackWeeks ?? 0) - (b.paybackWeeks ?? 0))[0];
     if (best) return { type: 'buyOffer', playerId: me.id, offerUid: best.offer.uid };
 
     const ownsStatus = me.owned.some((a) => getDef(a.defId).kind === 'status');
@@ -91,7 +113,13 @@ const grinder: Policy = (world, me) => {
   return action && action.type !== 'rest' ? action : null;
 };
 
-export const HUMAN_POLICIES: Record<string, Policy> = { sensible, 'no-upgrades': noUpgrades, idle, grinder };
+export const ENGAGEMENT_LABELS = { promote: 'Переезжает всегда', lend: 'Одалживает всем', rumors: 'Слушает слухи' };
+export const HUMAN_POLICIES: Record<string, Policy> = {
+  sensible, 'no-upgrades': noUpgrades, idle, grinder,
+  [ENGAGEMENT_LABELS.promote]: makeSensible({ alwaysPromote: true }),
+  [ENGAGEMENT_LABELS.lend]: makeSensible({ lendEveryone: true }),
+  [ENGAGEMENT_LABELS.rumors]: makeSensible({ listenRumors: true }),
+};
 
 /** Запас, который игрок оставляет после оплаты этапа мечты. */
 const DREAM_RESERVE = 150;

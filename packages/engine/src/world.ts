@@ -1,5 +1,6 @@
 // Создание нового мира: человек + три соседа-бота, первая доска сделок.
 import { initialMarket } from './market';
+import { newGoalsState } from './goals';
 import { fillInitialBoard } from './offers';
 import { Rng } from './rng';
 import * as R from './rules';
@@ -33,6 +34,7 @@ function newPlayer(id: string, name: string, islandName: string, botStyle?: BotS
     restedThisWeek: false,
     extraShift: false,
     insured: false,
+    insuranceFrom: null,
     loans: [],
     owned: [],
     freedomWeek: null,
@@ -41,6 +43,12 @@ function newPlayer(id: string, name: string, islandName: string, botStyle?: BotS
     bestLevel: 0,
     // Мечта есть только у человека; соседи-боты остаются на работе без мечты.
     dream: botStyle ? null : newDreamState(),
+    choice: null,
+    lastChoiceWeek: 0,
+    promotions: 0,
+    lent: [],
+    // Цели — тоже только у человека.
+    goals: botStyle ? null : newGoalsState(),
   };
   if (botStyle) player.botStyle = botStyle;
   return player;
@@ -48,7 +56,7 @@ function newPlayer(id: string, name: string, islandName: string, botStyle?: BotS
 
 export function createWorld(opts: { seed: number; playerName: string; islandName: string }): WorldState {
   const world: WorldState = {
-    version: 4,
+    version: 5,
     seed: opts.seed,
     rng: opts.seed >>> 0,
     nextUid: 1,
@@ -59,6 +67,7 @@ export function createWorld(opts: { seed: number; playerName: string; islandName
       ...BOT_ROSTER.map((b) => newPlayer(b.id, b.name, b.islandName, b.botStyle)),
     ],
     offers: [],
+    upcoming: [],
     lastReport: null,
   };
   const rng = new Rng(world.rng);

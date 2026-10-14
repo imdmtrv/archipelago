@@ -700,7 +700,7 @@ describe('миграция сохранений', () => {
 
     const world = migrateWorld(raw)!;
     expect(world).not.toBeNull();
-    expect(world.version).toBe(4);
+    expect(world.version).toBe(5);
     expect(JSON.stringify(raw)).toBe(snapshot); // вход не изменился
 
     const [human, mia, timur] = world.players;
@@ -744,7 +744,7 @@ describe('миграция сохранений', () => {
     const snapshot = JSON.stringify(raw);
     const migrated = migrateWorld(raw)!;
     expect(JSON.stringify(raw)).toBe(snapshot);
-    expect(migrated.version).toBe(4);
+    expect(migrated.version).toBe(5);
     expect(migrated.lastReport!.worldEvents[0]).toMatchObject({ id: 'storm', legacyTitle: 'Шторм', legacyText: 'Старый шторм' });
     expect(migrated.lastReport!.players.p1.events[0]).toMatchObject({ id: 'gift', legacyTitle: 'Подарок', legacyText: 'Старый подарок' });
     expect(migrated.lastReport!.news).toEqual([{ playerId: 'bot-mia', kind: 'legacy', legacyText: 'Старая новость' }]);
@@ -759,7 +759,7 @@ describe('миграция сохранений', () => {
     };
     const garbage: unknown[] = [
       null, undefined, 0, 42, 'world', true, [], {}, { version: 2 }, { version: 1, players: [] },
-      broken((w) => { w.version = 5; }),
+      broken((w) => { w.version = 6; }),
       broken((w) => { w.version = 0; }),
       broken((w) => { delete w.version; }),
       broken((w) => { w.players = 'no'; }),
@@ -800,7 +800,7 @@ describe('второй акт не трогает соседей', () => {
 describe('случайные действия: инварианты', () => {
   const ACTIONS: Action['type'][] = [
     'buyOffer', 'sellAsset', 'repairAsset', 'takeLoan', 'repayLoan', 'setInsurance', 'setExtraShift',
-    'study', 'rest', 'quitJob', 'returnToWork', 'buildDream', 'buildDream', 'quitJob', 'upgradeAsset', 'upgradeAsset',
+    'study', 'rest', 'quitJob', 'returnToWork', 'buildDream', 'buildDream', 'quitJob', 'upgradeAsset', 'upgradeAsset', 'resolveChoice',
   ];
 
   function randomAction(world: WorldState, rng: Rng): Action {
@@ -819,6 +819,7 @@ describe('случайные действия: инварианты', () => {
       case 'setInsurance': return { type, playerId: 'p1', on: rng.chance(0.5) };
       case 'setExtraShift': return { type, playerId: 'p1', on: rng.chance(0.5) };
       case 'endWeek': return { type };
+      case 'resolveChoice': return { type, playerId: 'p1', accept: rng.chance(0.5) };
       default: return { type, playerId: 'p1' };
     }
   }

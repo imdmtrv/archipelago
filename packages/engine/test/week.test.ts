@@ -118,6 +118,8 @@ describe('шторм и страховка', () => {
     const world = newWorld();
     world.players = world.players.slice(0, 2);
     player(world, 'p1').insured = true;
+    player(world, 'p1').insuranceFrom = 1;
+    world.upcoming = [{ kind: 'storm', week: 1, windowStart: 1, announcedWeek: -1 }];
     const insuredBoat = giveAsset(world, 'p1', 'boat');
     const bareBoat = giveAsset(world, 'bot-mia', 'boat');
     const reports = { p1: emptyReport('p1'), 'bot-mia': emptyReport('bot-mia') };
@@ -147,6 +149,7 @@ describe('шторм и страховка', () => {
   it('страховка покрывает лечение и стоит премию каждую неделю', () => {
     let world = soloWorld(3);
     player(world).insured = true;
+    player(world).insuranceFrom = 1;
     giveAsset(world, 'p1', 'boat', { price: 300 });
     let illnessSeen = false;
     for (let i = 0; i < 80; i++) {

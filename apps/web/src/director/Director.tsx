@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { ASSET_DEFS, financeView, offerViews, type WorldState } from '@arch/engine';
+import { ASSET_DEFS, financeView, migrateWorld, offerViews, type WorldState } from '@arch/engine';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { asset } from '../asset';
 import { audio } from '../audio/engine';
@@ -30,6 +30,12 @@ type Fixtures = {
   freedom: Save;
 };
 const fixtures = fixturesData as unknown as Fixtures;
+// Кадры сохранены в v4; до любых расчётов переводим их в текущий контракт.
+for (const key of ['scamCard', 'neighbors', 'freedom'] as const) {
+  const world = migrateWorld(fixtures[key].world);
+  if (!world) throw new Error(`Invalid director fixture: ${key}`);
+  fixtures[key] = { ...fixtures[key], world };
+}
 const DIRECTOR_EDIT = { ...EDIT, shotSpecs: SHOTS };
 const pearlOffer = (() => {
   const offer = offerViews(fixtures.scamCard.world, 'p1').find((view) => view.def.id === 'pearlFarm');

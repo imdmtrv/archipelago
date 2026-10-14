@@ -1,5 +1,5 @@
 // Контент: все сделки архипелага. Числа — базовые, конкретное предложение отклоняется от них случайно.
-import type { AssetDef, DealKind, DreamDef } from './types';
+import type { AssetDef, DealKind, DreamDef, GoalDef } from './types';
 import * as R from './rules';
 
 // Улучшения (`upgrades`) стоят дороже самой сделки и окупаются медленнее новой покупки: при рынке 1.0
@@ -138,6 +138,25 @@ export function isScamVisible(defId: string, knowledge: number): boolean {
   const def = ASSET_DEFS[defId];
   return def?.kind === 'scam' && knowledge >= (def.scamSightKnowledge ?? R.SCAM_SIGHT_KNOWLEDGE);
 }
+
+/**
+ * Цели на несколько недель — в порядке выдачи; видно GOALS_ACTIVE сразу. Каждая — урок о деньгах:
+ * знания, подушка, разнообразие, пассивный доход, реинвестиции, жизнь без ростовщика, страховка заранее,
+ * долги, доля пассивного дохода, запас прочности. Как считается прогресс — в goals.ts.
+ */
+export const GOALS: GoalDef[] = [
+  { id: 'study', reward: { cash: 40, joy: 0 } },          // знания: уровень 1
+  { id: 'cushion', reward: { cash: 50, joy: 0 } },        // наличные ≥ 3 недель всех расходов
+  { id: 'sectors', reward: { cash: 60, joy: 3 } },        // доходные активы в трёх секторах
+  { id: 'passive100', reward: { cash: 80, joy: 0 } },     // пассивный доход ≥ 100 в неделю
+  { id: 'upgrade', reward: { cash: 60, joy: 0 } },        // улучшить любой актив
+  { id: 'noLoanShark', reward: { cash: 60, joy: 0 } },    // 15 недель подряд без ростовщика
+  { id: 'share30', reward: { cash: 60, joy: 0 } },        // пассивный доход ≥ 30% всех доходов
+  { id: 'halfway', reward: { cash: 100, joy: 0 } },       // свобода 50%
+  { id: 'insuredStorm', reward: { cash: 0, joy: 5 } },    // пережить шторм под действующей страховкой
+  { id: 'debtFree', reward: { cash: 50, joy: 3 } },       // закрыть все кредиты (выдаётся, если кредит был)
+  { id: 'level150', reward: { cash: 150, joy: 5 } },      // «Уверенность»: 150%
+];
 
 /** Мечты. Пока одна — шхуна; выбор мечты на старте появится вместе с профессиями. */
 export const DREAMS: Record<string, DreamDef> = {
