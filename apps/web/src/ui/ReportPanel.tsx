@@ -25,7 +25,6 @@ export function FreedomBlock({ compact = false }: { compact?: boolean }) {
             ? <>{t.ui.report.covered} <b>{t.ui.report.hold}</b></>
             : <>{t.ui.report.passiveCovers(fmt(fin.passiveIncome), fmt(fin.expenses.total))}</>}
         </div>
-        {!compact && world.week >= 5 && <ShareButton challenge className="btn ghost challenge-button" />}
       </div>
     );
   }
@@ -71,7 +70,8 @@ export function FreedomBlock({ compact = false }: { compact?: boolean }) {
           {t.ui.report.employedShortfall}
         </div>
       )}
-      {!compact && world.week >= 5 && <ShareButton challenge className="btn ghost challenge-button" />}
+      {/* Вызов — только после свободы: понятный результат «свобода за N недель» и полный путь призрака */}
+      {!compact && <ShareButton challenge className="btn ghost challenge-button" />}
     </div>
   );
 }
