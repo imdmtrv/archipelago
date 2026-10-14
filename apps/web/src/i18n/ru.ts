@@ -694,6 +694,9 @@ export const ru = {
       pending: 'Сначала решите развилку',
       freedom: (before: number, after: number) => `Свобода: ${before}% → ${after}%`,
       neighborLoan: {
+        amount: 'Сумма займа',
+        back: (coins: string) => `Вернёт ${coins}, если дела пойдут`,
+        viewNeighbor: 'Посмотреть карточку соседа',
         title: (name: string) => `${name} просит в долг`,
         text: (name: string, female: boolean, coins: string, back: string) =>
           `${name} ${female ? 'попала' : 'попал'} в трудное положение и просит ${coins}. Обещает вернуть ${back} через несколько недель — если дела пойдут.`,
@@ -749,7 +752,7 @@ export const ru = {
       title: 'Слухи',
       kinds: { storm: 'Шторм', fishShoal: 'Косяк рыбы', touristBoom: 'Наплыв туристов', crisis: 'Кризис' },
       when: {
-        range: (from: number, to: number) => `через ${from}–${to} недели`,
+        range: (from: number, to: number) => `через ${from}–${to} ${to >= 5 ? 'недель' : 'недели'}`,
         thisOrNext: 'на этой или следующей неделе',
         thisWeek: 'на этой неделе',
         exact: (week: number) => `на ${week}-й неделе`,

@@ -9,7 +9,8 @@ import { applyAction } from '../src/reducer';
 import { financeView } from '../src/selectors';
 import type { WorldState } from '../src/types';
 import { createWorld, HUMAN_ID } from '../src/world';
-import { ACT_LABELS, HUMAN_POLICIES, SECOND_ACT_POLICIES } from './policies';
+import * as R from '../src/rules';
+import { ACT_LABELS, ENGAGEMENT_LABELS, HUMAN_POLICIES, SECOND_ACT_POLICIES } from './policies';
 
 // ───────────── Прогон ─────────────
 
@@ -30,6 +31,9 @@ interface Outcome {
   bestLevel: number;          // высший уровень свободы за игру (0..3)
   passive: number;            // настоящий пассивный доход в неделю к концу игры
   upgrades: number;           // сколько раз человек улучшал своё
+  lent: number;               // выданные соседям монеты
+  returned: number;           // возвращённые монеты без благодарности
+  goals100: number;           // выполнено целей к 100-й неделе
 }
 
 function hasNaN(value: unknown): boolean {
@@ -44,12 +48,14 @@ function runGame(seed: number, weeks: number, humanPolicy: Policy): Map<string, 
   const stats = new Map<string, Outcome>(world.players.map((p) => [p.id, {
     freedomWeek: null, debt: 0, burnouts: 0, emergencyWeeks: 0, netWorth: 0, scamsLost: 0,
     dreamWeek: null, forcedReturns: 0, quitAfterFreedom: false, joySum: 0, joyWeeks: 0,
-    bestLevel: 0, passive: 0, upgrades: 0,
+    bestLevel: 0, passive: 0, upgrades: 0, lent: 0, returned: 0, goals100: 0,
   }]));
   for (let w = 0; w < weeks; w++) {
     const turn = runBotTurn(world, HUMAN_ID, humanPolicy);
     if (turn.errors.length) throw new Error(`seed ${seed}: ${turn.errors.join('; ')}`);
     stats.get(HUMAN_ID)!.upgrades += turn.actions.filter((a) => a.type === 'upgradeAsset').length;
+    stats.get(HUMAN_ID)!.lent += turn.world.players[0].lent
+      .filter((l) => !world.players[0].lent.some((old) => old.uid === l.uid)).reduce((sum, l) => sum + l.amount, 0);
     const result = applyAction(turn.world, { type: 'endWeek' });
     if (result.error) throw new Error(result.error.code);
     world = result.world;
@@ -59,7 +65,10 @@ function runGame(seed: number, weeks: number, humanPolicy: Policy): Map<string, 
       if (report.events.some((e) => e.id === 'emergencyLoan')) s.emergencyWeeks++;
       s.scamsLost += report.lostAssetUids.length;
       if (report.events.some((e) => e.id === 'backToWork')) s.forcedReturns++;
+      s.returned += report.events.filter((e) => e.id === 'neighborLoanReturned')
+        .reduce((sum, e) => sum + Math.round(Number(e.params?.amount) / (1 + R.NEIGHBOR_LOAN_BONUS)), 0);
     }
+    if (world.lastReport!.week <= 100) stats.get(HUMAN_ID)!.goals100 = world.players[0].goals?.done.length ?? 0;
     // Счастье «после свободы»: недели, следующие за той, в которую свобода достигнута.
     for (const p of world.players) {
       if (p.freedomWeek === null || world.lastReport!.week <= p.freedomWeek) continue;
@@ -292,6 +301,30 @@ function arg(name: string, fallback: number): number {
   return i >= 0 ? Number(process.argv[i + 1]) : fallback;
 }
 
+/** Дополнительные цели первого шага вовлечённости; прежние пороги сохраняются. */
+function checkEngagementTargets(sum: Map<string, Summary>, outcomes: Map<string, Outcome[]>): [string, boolean][] {
+  const baseline = sum.get(LABELS.sensible)!.median;
+  const median = (label: string) => sum.get(`human:${label}`)!.median;
+  const returned = (label: string) => {
+    const rows = outcomes.get(label)!;
+    const lent = rows.reduce((s, o) => s + o.lent, 0);
+    return lent > 0 ? rows.reduce((s, o) => s + o.returned, 0) / lent : 0;
+  };
+  const goalMedian = percentile(outcomes.get(LABELS.sensible)!.map((o) => o.goals100).sort((a, b) => a - b), 0.5);
+  console.log('Развилки, слухи и цели (доля возврата — от всех выданных монет)');
+  for (const label of [LABELS.sensible, ...Object.values(ENGAGEMENT_LABELS).map((l) => `human:${l}`)]) {
+    console.log(`${label}: свобода ${sum.get(label)!.median}; возврат ${(returned(label) * 100).toFixed(1)}%; цели к 100-й ${percentile(outcomes.get(label)!.map((o) => o.goals100).sort((a, b) => a - b), 0.5)}`);
+  }
+  console.log('');
+  return [
+    ['Переезжает всегда: свобода не раньше разумного', median(ENGAGEMENT_LABELS.promote) >= baseline],
+    ['Одалживает всем: свобода позже разумного не больше чем на 6 недель', median(ENGAGEMENT_LABELS.lend) >= baseline && median(ENGAGEMENT_LABELS.lend) <= baseline + 6],
+    ['Разумный получает большую долю возврата, чем одалживающий всем', returned(LABELS.sensible) > returned(`human:${ENGAGEMENT_LABELS.lend}`)],
+    ['Слушает слухи: свобода не позже разумного и раньше не больше чем на 3 недели', median(ENGAGEMENT_LABELS.rumors) <= baseline && median(ENGAGEMENT_LABELS.rumors) >= baseline - 3],
+    ['Разумный к 100-й неделе: медиана выполненных целей ≥ 6', goalMedian >= 6],
+  ];
+}
+
 function main(): void {
   const seeds = arg('seeds', 500);
   const weeks = arg('weeks', 100);
@@ -354,6 +387,7 @@ function main(): void {
     ...checkTargets(summaries),
     ...checkSecondActTargets(actSummaries, actOutcomes, sensibleFreedom, weeks),
     ...checkUpgradeTargets(withUp, without, weeks),
+    ...checkEngagementTargets(summaries, byLabel),
   ];
   for (const [name, passed] of checks) console.log(`${passed ? 'OK  ' : 'FAIL'} ${name}`);
   if (checks.some(([, passed]) => !passed)) process.exitCode = 1;

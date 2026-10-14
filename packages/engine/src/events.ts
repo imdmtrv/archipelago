@@ -1,14 +1,16 @@
 // Случайные события: личные (для каждого игрока) и общие (для всего архипелага).
 import { getDef, happinessJoy } from './economy';
+import { insuranceActive } from './engagement';
 import type { Rng } from './rng';
 import * as R from './rules';
-import type { DreamDef, EventParam, GameEvent, PlayerState, PlayerWeekReport, WorldState } from './types';
+import type { DreamDef, EventParam, GameEvent, PlayerState, PlayerWeekReport, WorldEventKind, WorldState } from './types';
 
 /** Все id событий — чтобы UI мог подобрать иконки. */
 export type EventId =
   | 'illness' | 'breakdown' | 'gift' | 'raise' | 'burnout'
   | 'storm' | 'stormDamage' | 'stormInsured' | 'fishShoal' | 'touristBoom' | 'crisis'
   | 'scamCollapse' | 'emergencyLoan' | 'freedom'
+  | 'rumor' | 'goalDone' | 'neighborLoanReturned' | 'neighborLoanLate' | 'neighborLoanLost' | 'insuranceStarted'
   | 'dreamStage' | 'dreamDone' | 'freedomLevel' | 'freedomThreat' | 'threatOver' | 'backToWork';
 
 /** Число текстовых вариантов. Порядок и количество синхронны со словарями UI. */
@@ -86,7 +88,7 @@ function applyStorm(world: WorldState, rng: Rng, reports: Record<string, PlayerW
     if (hit.length === 0) continue;
     const uids = hit.map((a) => a.uid);
     const assetRefs = hit.map((a) => `${a.defId}:${a.level}`);
-    if (player.insured) {
+    if (insuranceActive(player, world.week)) {
       reports[player.id].events.push(event('stormInsured', 'good', { assetRefs }, { affectedAssetUids: uids }));
       continue;
     }
@@ -97,10 +99,36 @@ function applyStorm(world: WorldState, rng: Rng, reports: Record<string, PlayerW
   return event('storm', 'bad', {}, { affectedAssetUids: damagedAll });
 }
 
-/** Бросает общее событие недели (не больше одного). Мутирует рынок и имущество копии мира. */
+/** Исполняет запланированное событие и объявляет новый слух (не больше одного на неделю). */
 export function rollWorldEvent(world: WorldState, rng: Rng, reports: Record<string, PlayerWeekReport>): GameEvent[] {
-  if (!rng.chance(R.WORLD_EVENT_CHANCE)) return [];
-  const kind = rng.weighted(R.WORLD_EVENT_WEIGHTS);
+  const due = world.upcoming.find((e) => e.week === world.week);
+  world.upcoming = world.upcoming.filter((e) => e.week !== world.week);
+  const events = due ? applyWorldEvent(due.kind, world, rng, reports) : [];
+  if (rng.chance(R.WORLD_EVENT_CHANCE)) {
+    const kind = rng.weighted(R.WORLD_EVENT_WEIGHTS);
+    const week = world.week + rng.int(...R.RUMOR_LEAD);
+    if (!world.upcoming.some((e) => e.week === week)) {
+      const windowStart = week - rng.int(0, 1);
+      world.upcoming.push({ kind, week, windowStart, announcedWeek: world.week });
+      for (const player of world.players) {
+        reports[player.id].events.push({ id: 'rumor', tone: 'neutral', params: {
+          kind, fromWeek: windowStart, toWeek: windowStart + 1,
+          ...(player.knowledge >= R.RUMOR_EXACT_KNOWLEDGE ? { exactWeek: week } : {}),
+        } });
+      }
+    }
+  }
+  return events;
+}
+
+function applyWorldEvent(kind: WorldEventKind, world: WorldState, rng: Rng, reports: Record<string, PlayerWeekReport>): GameEvent[] {
+  if (kind === 'storm') {
+    for (const player of world.players) {
+      if (player.goals && insuranceActive(player, world.week) && player.owned.some((a) => getDef(a.defId).stormRisk > 0)) {
+        player.goals.insuredStorm = true;
+      }
+    }
+  }
   const market = world.market;
   switch (kind) {
     case 'storm': return [applyStorm(world, rng, reports)];

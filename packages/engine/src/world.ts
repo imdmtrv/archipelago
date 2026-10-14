@@ -1,5 +1,6 @@
 // Создание нового мира: человек + три соседа-бота, первая доска сделок.
 import { initialMarket } from './market';
+import { newGoalsState } from './goals';
 import { fillInitialBoard } from './offers';
 import { Rng } from './rng';
 import * as R from './rules';
@@ -46,8 +47,8 @@ function newPlayer(id: string, name: string, islandName: string, botStyle?: BotS
     lastChoiceWeek: 0,
     promotions: 0,
     lent: [],
-    // Цели — тоже только у человека. TODO(движок): начальный набор целей (первые GOALS_ACTIVE из GOALS).
-    goals: botStyle ? null : { active: [], done: [], calmWeeks: 0, hadLoan: false, insuredStorm: false },
+    // Цели — тоже только у человека.
+    goals: botStyle ? null : newGoalsState(),
   };
   if (botStyle) player.botStyle = botStyle;
   return player;

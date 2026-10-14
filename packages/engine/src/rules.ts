@@ -95,8 +95,8 @@ export const RUMOR_LEAD: [number, number] = [2, 4]; // общее событие
 export const RUMOR_EXACT_KNOWLEDGE = 2;     // с этого уровня знаний слух называет точную неделю
 
 // ───────────── Развилки (только у человека) ─────────────
-export const CHOICE_CHANCE = 0.2;           // шанс развилки в конце недели…
-export const CHOICE_COOLDOWN = 4;           // …не раньше чем через 4 недели после прошлой
+export const CHOICE_CHANCE = 0.3;           // шанс развилки в конце недели…
+export const CHOICE_COOLDOWN = 3;           // …не раньше чем через 3 недели после прошлой
 export const CHOICE_WEIGHTS = { neighborLoan: 0.4, promotion: 0.25, buyer: 0.35 } as const;
 export const NEIGHBOR_LOAN_ASK: [number, number] = [200, 350]; // сосед просит, округляется до 10
 export const NEIGHBOR_LOAN_BONUS = 0.1;     // возвращает с благодарностью +10%

@@ -3,6 +3,7 @@ import {
   freeSlotIndex, getDef, getDream, loanLimit, nextUpgrade, repairCost, saleValue, studyCost, upgradedAsset,
 } from './economy';
 import { nextUid } from './offers';
+import { resolvePendingChoice } from './choices';
 import { Rng } from './rng';
 import * as R from './rules';
 import type { Action, ActionResult, EngineError, OwnedAsset, PlayerState, WorldState } from './types';
@@ -106,6 +107,7 @@ const takeLoan: Handler<Extract<PlayerAction, { type: 'takeLoan' }>> = (world, p
 
 /** Обычные кредиты и долги ростовщику копятся в одной записи каждого вида. */
 export function addLoan(world: WorldState, player: PlayerState, amount: number, emergency: boolean): void {
+  if (!emergency && player.goals) player.goals.hadLoan = true;
   const existing = player.loans.find((l) => l.emergency === emergency);
   if (existing) {
     existing.principal += amount;
@@ -131,7 +133,9 @@ const repayLoan: Handler<Extract<PlayerAction, { type: 'repayLoan' }>> = (_world
   return null;
 };
 
-const setInsurance: Handler<Extract<PlayerAction, { type: 'setInsurance' }>> = (_world, player, action) => {
+const setInsurance: Handler<Extract<PlayerAction, { type: 'setInsurance' }>> = (world, player, action) => {
+  if (action.on && !player.insured) player.insuranceFrom = world.week + R.INSURANCE_WAIT_WEEKS;
+  if (!action.on) player.insuranceFrom = null;
   player.insured = action.on;
   return null;
 };
@@ -202,8 +206,8 @@ const buildDream: Handler<Extract<PlayerAction, { type: 'buildDream' }>> = (_wor
   return null;
 };
 
-// TODO(движок): принять или отклонить развилку по docs/specs/engagement-1.md. Пока развилок не бывает.
-const resolveChoice: Handler<Extract<PlayerAction, { type: 'resolveChoice' }>> = () => ({ code: 'noChoice' });
+const resolveChoice: Handler<Extract<PlayerAction, { type: 'resolveChoice' }>> = (world, player, action) =>
+  resolvePendingChoice(world, player, action.accept);
 
 const HANDLERS: { [T in PlayerAction['type']]: Handler<Extract<PlayerAction, { type: T }>> } = {
   buyOffer, sellAsset, repairAsset, upgradeAsset, takeLoan, repayLoan, setInsurance, setExtraShift, study, rest,
@@ -217,5 +221,9 @@ export function applyPlayerAction(input: WorldState, action: PlayerAction): Acti
   const player = world.players.find((p) => p.id === action.playerId);
   if (!player) return { world: input, error: err('unknownPlayer') };
   const error = handler(world, player, action);
+  // Недействительное предложение покупателя снимается даже при ошибке согласия.
+  if (error && action.type === 'resolveChoice' && input.players.find((p) => p.id === player.id)?.choice && !player.choice) {
+    return { world, error };
+  }
   return error ? { world: input, error } : { world };
 }

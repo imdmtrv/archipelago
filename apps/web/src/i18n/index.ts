@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { EngineError, GameEvent, PlayerState, Sector, SlotType, WeekNewsItem } from '@arch/engine';
+import { GOALS, type EngineError, type GameEvent, type GoalReward, type PlayerState, type RumorView, type Sector, type SlotType, type WeekNewsItem } from '@arch/engine';
 import { ru, type Dict } from './ru';
 import { en } from './en';
 
@@ -154,11 +154,47 @@ function eventAssetNames(refs: unknown): string {
   }).join(', ') : '';
 }
 
-export function eventCopy(event: GameEvent): { title: string; text: string } {
+/** Общая формулировка срока для плашки и события слуха. */
+export function rumorWhen(rumor: Pick<RumorView, 'fromWeek' | 'toWeek' | 'exactWeek'>, currentWeek: number): string {
+  const { when } = getI18n().t.ui.rumors;
+  if (rumor.exactWeek !== null) return rumor.exactWeek === currentWeek ? when.thisWeek : when.exact(rumor.exactWeek);
+  return rumor.fromWeek <= currentWeek ? when.thisOrNext : when.range(rumor.fromWeek - currentWeek, rumor.toWeek - currentWeek);
+}
+
+export function goalCopy(id: string) {
+  return getI18n().t.ui.goals.items[id as keyof typeof ru.ui.goals.items] ?? { title: id, text: '' };
+}
+
+export function goalRewardText(reward: GoalReward): string {
+  const { t } = getI18n();
+  return [reward.cash > 0 ? coins(reward.cash) : '', reward.joy > 0 ? t.ui.goals.joy(reward.joy) : ''].filter(Boolean).join(', ');
+}
+
+export function eventCopy(event: GameEvent, players: readonly PlayerState[] = [], currentWeek = 1): { title: string; text: string } {
   if (event.legacyTitle !== undefined || event.legacyText !== undefined) return { title: event.legacyTitle ?? '', text: event.legacyText ?? '' };
   const { t } = getI18n();
   const p = event.params ?? {};
   switch (event.id) {
+    case 'rumor': {
+      const kind = String(p.kind) as RumorView['kind'];
+      const text = t.events.rumor[kind];
+      const when = rumorWhen({ fromWeek: Number(p.fromWeek), toWeek: Number(p.toWeek), exactWeek: p.exactWeek === undefined ? null : Number(p.exactWeek) }, currentWeek);
+      return { title: t.events.rumor.title, text: text ? text(when) : '' };
+    }
+    case 'goalDone': {
+      const id = String(p.goalId);
+      const reward = GOALS.find((goal) => goal.id === id)?.reward ?? { cash: event.cashDelta ?? 0, joy: 0 };
+      return { title: t.events.goalDone.title(goalCopy(id).title), text: t.events.goalDone.text(goalRewardText(reward)) };
+    }
+    case 'neighborLoanReturned':
+    case 'neighborLoanLate':
+    case 'neighborLoanLost': {
+      const id = String(p.neighborId);
+      const name = newsPlayer(id, players);
+      const copy = t.events[event.id];
+      return { title: copy.title(name), text: copy.text(name, femaleBot(id), coins(Number(p.amount ?? 0))) };
+    }
+    case 'insuranceStarted': return t.events.insuranceStarted;
     case 'burnout': return t.events.burnout;
     case 'illness': return { title: t.events.illness.title, text: p.insured ? t.events.illness.insured : t.events.illness.uninsured(coins(Number(p.cost ?? 0))) };
     case 'breakdown': return { title: t.events.breakdown.title, text: t.events.breakdown.variants[event.variant ?? 0] };

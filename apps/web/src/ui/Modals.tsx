@@ -140,7 +140,7 @@ export function WeekModal() {
 
         <div className="events">
           {modal.events.map((e, i) => {
-            const copy = eventCopy(e);
+            const copy = eventCopy(e, world.players, world.week);
             return (
               <div key={i} className={`event ${e.tone}`}>
                 <div className="event-head">
