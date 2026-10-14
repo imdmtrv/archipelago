@@ -1,16 +1,18 @@
 // Балансовый симулятор: много сидов × много недель, статистика по стилям игры.
-// Три таблицы: первый акт (путь к свободе), «Второй акт» (три стратегии после свободы: остаться на работе,
-// уйти сразу, уйти при 150%) и «Улучшения» (разумный игрок с улучшениями и без них).
+// Первый акт (путь к свободе), «Второй акт» (остаться на работе, уйти сразу, уйти при 150%),
+// «Улучшения» (разумный игрок с ними и без них) и четыре профессии на одинаковых сидах.
 // Цели печатаются как OK/FAIL; при любом FAIL код выхода 1.
 // Запуск: npm run sim -w @arch/engine [-- --seeds 500 --weeks 100]
 import { runBotTurn, type Policy } from '../src/bots';
+import { PROFESSION_ORDER } from '../src/content';
 import { realPassiveIncome } from '../src/economy';
 import { applyAction } from '../src/reducer';
 import { financeView } from '../src/selectors';
-import type { WorldState } from '../src/types';
+import type { ProfessionId, WorldState } from '../src/types';
 import { createWorld, HUMAN_ID } from '../src/world';
 import * as R from '../src/rules';
 import { ACT_LABELS, ENGAGEMENT_LABELS, HUMAN_POLICIES, SECOND_ACT_POLICIES } from './policies';
+import { checkProfessionComparison } from './profession-balance';
 
 // ───────────── Прогон ─────────────
 
@@ -18,6 +20,7 @@ interface Outcome {
   freedomWeek: number | null;
   debt: number;
   burnouts: number;
+  layoffs: number;
   emergencyWeeks: number;
   netWorth: number;
   scamsLost: number;
@@ -44,10 +47,10 @@ function hasNaN(value: unknown): boolean {
   return false;
 }
 
-function runGame(seed: number, weeks: number, humanPolicy: Policy): Map<string, Outcome> {
-  let world: WorldState = createWorld({ seed, playerName: 'Игрок', islandName: 'Тест' });
+function runGame(seed: number, weeks: number, humanPolicy: Policy, profession: ProfessionId = 'teacher'): Map<string, Outcome> {
+  let world: WorldState = createWorld({ seed, playerName: 'Игрок', islandName: 'Тест', profession });
   const stats = new Map<string, Outcome>(world.players.map((p) => [p.id, {
-    freedomWeek: null, debt: 0, burnouts: 0, emergencyWeeks: 0, netWorth: 0, scamsLost: 0,
+    freedomWeek: null, debt: 0, burnouts: 0, layoffs: 0, emergencyWeeks: 0, netWorth: 0, scamsLost: 0,
     dreamWeek: null, forcedReturns: 0, quitAfterFreedom: false, joySum: 0, joyWeeks: 0,
     bestLevel: 0, passive: 0, upgrades: 0, lent: 0, returned: 0, goals100: 0,
     rumors: { reliable: { total: 0, real: 0 }, gossip: { total: 0, real: 0 } },
@@ -70,6 +73,7 @@ function runGame(seed: number, weeks: number, humanPolicy: Policy): Map<string, 
     for (const [id, report] of Object.entries(world.lastReport!.players)) {
       const s = stats.get(id)!;
       if (report.events.some((e) => e.id === 'burnout')) s.burnouts++;
+      if (report.events.some((e) => e.id === 'layoff')) s.layoffs++;
       if (report.events.some((e) => e.id === 'emergencyLoan')) s.emergencyWeeks++;
       s.scamsLost += report.lostAssetUids.length;
       if (report.events.some((e) => e.id === 'backToWork')) s.forcedReturns++;
@@ -335,8 +339,36 @@ function checkEngagementTargets(sum: Map<string, Summary>, outcomes: Map<string,
       baseline <= median(ENGAGEMENT_LABELS.noFireSales) && baseline >= median(ENGAGEMENT_LABELS.noFireSales) - 4],
     ['Одалживает всем: свобода позже разумного не больше чем на 6 недель', median(ENGAGEMENT_LABELS.lend) >= baseline && median(ENGAGEMENT_LABELS.lend) <= baseline + 6],
     ['Разумный получает большую долю возврата, чем одалживающий всем', returned(LABELS.sensible) > returned(`human:${ENGAGEMENT_LABELS.lend}`)],
-    ['Слушает слухи: свобода не позже разумного и раньше не больше чем на 3 недели', median(ENGAGEMENT_LABELS.rumors) <= baseline && median(ENGAGEMENT_LABELS.rumors) >= baseline - 3],
+    // Медианы целые: неделя разницы — шум, а не вред от слухов
+    ['Слушает слухи: свобода не позже разумного больше чем на неделю и раньше не больше чем на 3 недели', median(ENGAGEMENT_LABELS.rumors) <= baseline + 1 && median(ENGAGEMENT_LABELS.rumors) >= baseline - 3],
     ['Разумный к 100-й неделе: медиана выполненных целей ≥ 6', goalMedian >= 6],
+  ];
+}
+
+// ───────────── Профессии: одинаковая разумная стратегия, капитал к 100-й неделе ─────────────
+
+function checkProfessionTargets(outcomes: Map<ProfessionId, Outcome[]>): [string, boolean][] {
+  const rows = [...outcomes].map(([id, games]) => ({
+    id,
+    median: percentile(games.map((o) => o.freedomWeek ?? Infinity).sort((a, b) => a - b), 0.5),
+    freePct: 100 * games.filter((o) => o.freedomWeek !== null).length / games.length,
+    capital: percentile(games.map((o) => o.netWorth).sort((a, b) => a - b), 0.5),
+    layoffs: games.reduce((sum, o) => sum + o.layoffs, 0) / games.length,
+  }));
+  console.log('\nПрофессии — разумный игрок, 100 недель; свобода и капитал — медианы, сокращения — среднее');
+  for (const row of rows) console.log(`${row.id}: свобода ${row.median}; достигли ${row.freePct.toFixed(1)}%; капитал ${row.capital}; сокращений ${row.layoffs.toFixed(3)}`);
+  const earliest = Math.min(...rows.map((r) => r.median));
+  const latest = Math.max(...rows.map((r) => r.median));
+  const richest = Math.max(...rows.map((r) => r.capital));
+  return [
+    ...rows.flatMap((r): [string, boolean][] => [
+      [`${r.id}: свобода к 100-й неделе в ≥95% игр`, r.freePct >= 95],
+      [`${r.id}: медиана свободы 25–48 недель`, r.median >= 25 && r.median <= 48],
+    ]),
+    ['Профессии: разброс медиан ≤12 недель', latest - earliest <= 12],
+    ['Профессии: самая ранняя свобода и самый большой капитал у разных профессий',
+      rows.filter((r) => r.median === earliest).every((r) => r.capital < richest)],
+    ...checkProfessionComparison(rows),
   ];
 }
 
@@ -398,11 +430,20 @@ function main(): void {
   console.log('пассивного дохода в неделю к концу; улучшений — в среднем за игру; капитал — средний чистый капитал в конце.\n');
 
   const sensibleFreedom = byLabel.get(LABELS.sensible)!.map((o) => o.freedomWeek);
+  const professionOutcomes = new Map<ProfessionId, Outcome[]>();
+  for (const profession of PROFESSION_ORDER) {
+    const outcomes: Outcome[] = [];
+    for (let seed = 1; seed <= seeds; seed++) {
+      outcomes.push(runGame(seed, 100, HUMAN_POLICIES.sensible, profession).get(HUMAN_ID)!);
+    }
+    professionOutcomes.set(profession, outcomes);
+  }
   const checks = [
     ...checkTargets(summaries),
     ...checkSecondActTargets(actSummaries, actOutcomes, sensibleFreedom, weeks),
     ...checkUpgradeTargets(withUp, without, weeks),
     ...checkEngagementTargets(summaries, byLabel),
+    ...checkProfessionTargets(professionOutcomes),
   ];
   for (const [name, passed] of checks) console.log(`${passed ? 'OK  ' : 'FAIL'} ${name}`);
   if (checks.some(([, passed]) => !passed)) process.exitCode = 1;

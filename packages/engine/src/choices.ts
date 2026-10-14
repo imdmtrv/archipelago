@@ -13,7 +13,9 @@ export function generateChoice(world: WorldState, player: PlayerState, rng: Rng)
   if (player.isBot || player.choice || world.week < 3 || world.week - player.lastChoiceWeek < R.CHOICE_COOLDOWN) return;
   if (!rng.chance(R.CHOICE_CHANCE)) return;
   const bots = world.players.filter((p) => p.isBot);
-  const neighbor = bots.find((p) => p.loans.some((l) => l.emergency)) ?? [...bots].sort((a, b) => a.cash - b.cash)[0];
+  const askers = bots.filter((p) => !player.lent.some((l) => l.neighborId === p.id)
+    && (player.noAskUntil[p.id] ?? 0) < 1000000 && (player.noAskUntil[p.id] ?? 0) <= world.week);
+  const neighbor = askers.find((p) => p.loans.some((l) => l.emergency)) ?? [...askers].sort((a, b) => a.cash - b.cash)[0];
   const amount = Math.round(rng.range(...R.NEIGHBOR_LOAN_ASK) / 10) * 10;
   const assets = player.owned.filter((a) => buyerAsset(player, a.uid));
   const sellers = bots.filter((p) => p.loans.some((l) => l.emergency) || p.cash < R.FIRE_SALE_TROUBLE_CASH)
@@ -46,7 +48,14 @@ export function generateChoice(world: WorldState, player: PlayerState, rng: Rng)
 export function resolvePendingChoice(world: WorldState, player: PlayerState, accept: boolean): EngineError | null {
   const choice = player.choice;
   if (!choice) return { code: 'noChoice' };
-  if (!accept) { player.choice = null; return null; }
+  if (!accept) {
+    if (choice.kind === 'neighborLoan') {
+      const neighborId = String(choice.params.neighborId);
+      player.noAskUntil[neighborId] = Math.max(player.noAskUntil[neighborId] ?? 0, world.week + R.NEIGHBOR_ASK_AFTER_DECLINE);
+    }
+    player.choice = null;
+    return null;
+  }
   if (choice.kind === 'neighborLoan') {
     const amount = Number(choice.params.amount);
     if (player.cash < amount) return { code: 'notEnoughCash', missing: amount - player.cash };
@@ -99,6 +108,7 @@ export function settleLent(world: WorldState, reports: Record<string, PlayerWeek
       }
       loan.tries++;
       if (loan.tries >= R.NEIGHBOR_LOAN_TRIES) {
+        player.noAskUntil[loan.neighborId] = 1000000;
         report.events.push({ id: 'neighborLoanLost', tone: 'bad', params: { neighborId: loan.neighborId, amount: loan.amount } });
         return false;
       }

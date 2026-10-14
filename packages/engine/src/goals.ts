@@ -22,7 +22,8 @@ function fillGoals(goals: GoalsState): void {
 export function goalProgress(world: WorldState, player: PlayerState, id: string): GoalView {
   const passive = realPassiveIncome(player, world.market);
   const freedom = Math.round(realFreedomRatio(player, world.market) * 100);
-  const salary = player.employed ? Math.round(player.salary * (player.extraShift ? 1 + R.EXTRA_SHIFT_BONUS : 1)) : 0;
+  const salary = player.employed && player.layoffWeeks === 0
+    ? Math.round(player.salary * (player.extraShift ? 1 + R.EXTRA_SHIFT_BONUS : 1)) : 0;
   const progress: Record<string, [number, number]> = {
     study: [Math.min(player.knowledge, 1), 1],
     cushion: [player.cash, 3 * weeklyExpenses(player).total],
@@ -45,18 +46,21 @@ export function settleGoals(world: WorldState, player: PlayerState, report: Play
   if (player.isBot || !goals) return;
   goals.calmWeeks = report.events.some((e) => e.id === 'emergencyLoan') ? 0 : goals.calmWeeks + 1;
   goals.hadLoan ||= player.loans.some((l) => !l.emergency);
-  // Новые цели выдаются после проверки: награда не запускает цепочку всех целей за одну неделю.
-  const complete = goals.active.map((id) => goalProgress(world, player, id)).filter((g) => g.value >= g.target);
-  for (const goal of complete) {
-    goals.active = goals.active.filter((id) => id !== goal.id);
-    goals.done.push({ id: goal.id, week: world.week });
-    player.cash += goal.reward.cash;
-    const beforeJoy = player.happiness;
-    player.happiness = clamp(player.happiness + goal.reward.joy, 0, 100);
-    report.happinessDelta += player.happiness - beforeJoy;
-    report.events.push({ id: 'goalDone', tone: 'good', params: { goalId: goal.id }, cashDelta: goal.reward.cash });
-    report.eventsCash += goal.reward.cash;
-    report.net += goal.reward.cash;
+  // Проверяем и новые цели, и прогресс после наград в той же неделе.
+  while (true) {
+    fillGoals(goals);
+    const complete = goals.active.map((id) => goalProgress(world, player, id)).filter((g) => g.value >= g.target);
+    if (!complete.length) break;
+    for (const goal of complete) {
+      goals.active = goals.active.filter((id) => id !== goal.id);
+      goals.done.push({ id: goal.id, week: world.week });
+      player.cash += goal.reward.cash;
+      const beforeJoy = player.happiness;
+      player.happiness = clamp(player.happiness + goal.reward.joy, 0, 100);
+      report.happinessDelta += player.happiness - beforeJoy;
+      report.events.push({ id: 'goalDone', tone: 'good', params: { goalId: goal.id }, cashDelta: goal.reward.cash });
+      report.eventsCash += goal.reward.cash;
+      report.net += goal.reward.cash;
+    }
   }
-  fillGoals(goals);
 }

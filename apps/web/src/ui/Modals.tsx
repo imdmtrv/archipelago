@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DREAM_WORK_EMPLOYED, getPlayer } from '@arch/engine';
+import { DREAM_WORK_EMPLOYED, getPlayer, PROFESSIONS, PROFESSION_ORDER, type ProfessionId } from '@arch/engine';
 import { HUMAN, useGame, type WeekModal as WeekModalData } from '../store';
 import { fmt, signed, weeksAcc } from '../format';
 import { challengeComparison, challengeResult, dictFor, dreamCopy, eventCopy, useI18n, type Lang } from '../i18n';
@@ -17,6 +17,8 @@ export function WelcomeModal({ challenge = null, onDismiss }: { challenge?: Chal
   const hasGame = useGame((s) => !!s.world);
   const [island, setIsland] = useState(challenge?.island ?? t.meta.defaultIsland);
   const [name, setName] = useState('');
+  const [selectedProfession, setProfession] = useState<ProfessionId>('teacher');
+  const profession = challenge?.profession ?? selectedProfession;
   const feedbackUrl = import.meta.env.VITE_FEEDBACK_URL?.trim();
   const switchLanguage = (next: Lang) => {
     const currentDefault = dictFor(lang).meta.defaultIsland;
@@ -30,7 +32,8 @@ export function WelcomeModal({ challenge = null, onDismiss }: { challenge?: Chal
         className="modal panel welcome"
         onSubmit={(e) => {
           e.preventDefault();
-          newGame(island.trim() || t.meta.defaultIsland, name.trim() || t.meta.defaultPlayer, challenge?.seed, challenge);
+          newGame(island.trim() || t.meta.defaultIsland, name.trim() || t.meta.defaultPlayer, challenge?.seed, challenge, profession);
+          track(`profession-${profession}`);
           if (challenge) track('challenge-start');
           onDismiss?.();
         }}
@@ -39,8 +42,7 @@ export function WelcomeModal({ challenge = null, onDismiss }: { challenge?: Chal
           <button type="button" className={lang === 'ru' ? 'active' : ''} onClick={() => switchLanguage('ru')}>RU</button>
           <button type="button" className={lang === 'en' ? 'active' : ''} onClick={() => switchLanguage('en')}>EN</button>
         </div>
-        <Emblem />
-        <h2>{t.meta.app}</h2>
+        <div className="welcome-heading"><Emblem /><h2>{t.meta.app}</h2></div>
         <p className="lead">{challenge ? challengeResult(challenge) : t.ui.welcome.lead}</p>
         {challenge && hasGame && <p className="challenge-warning">{t.ui.challenge.replace}</p>}
         <ul className="rules">
@@ -49,14 +51,38 @@ export function WelcomeModal({ challenge = null, onDismiss }: { challenge?: Chal
           <li><b>{t.ui.welcome.goal}</b> {t.ui.welcome.goalRule}</li>
           <li><b>{t.ui.welcome.dream}</b> {t.ui.welcome.dreamRule}</li>
         </ul>
-        <label className="field">
-          <span>{t.ui.welcome.island}</span>
-          <input value={island} maxLength={24} onChange={(e) => setIsland(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>{t.ui.welcome.name}</span>
-          <input value={name} maxLength={20} placeholder={t.meta.exampleName} onChange={(e) => setName(e.target.value)} />
-        </label>
+        <div className="welcome-fields">
+          <label className="field">
+            <span>{t.ui.welcome.island}</span>
+            <input value={island} maxLength={24} onChange={(e) => setIsland(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>{t.ui.welcome.name}</span>
+            <input value={name} maxLength={20} placeholder={t.meta.exampleName} onChange={(e) => setName(e.target.value)} />
+          </label>
+        </div>
+        <fieldset className="profession-picker" aria-describedby="profession-hint">
+          <legend>{t.ui.welcome.profession}</legend>
+          <div className="profession-grid">
+            {PROFESSION_ORDER.map((id) => {
+              const copy = t.professions[id];
+              const def = PROFESSIONS[id];
+              return <label key={id} className={`profession-card ${profession === id ? 'selected' : ''}`}>
+                <input type="radio" name="profession" value={id} checked={profession === id} disabled={!!challenge} onChange={() => setProfession(id)} />
+                <b>{copy.title}</b>
+                <span className="profession-text">{copy.text}</span>
+                <span className="profession-stats">
+                  <span>{t.ui.welcome.professionSalary(fmt(def.salary))}</span>
+                  <span>{t.ui.welcome.professionLiving(fmt(def.living))}</span>
+                  <span>{t.ui.welcome.professionCash(fmt(def.cash))}</span>
+                  {def.loan > 0 && <span>{t.ui.welcome.professionLoan(fmt(def.loan))}</span>}
+                </span>
+              </label>;
+            })}
+          </div>
+          <p id="profession-hint" className="profession-hint">{t.ui.welcome.professionHint}</p>
+          {challenge && <p className="profession-hint">{t.ui.welcome.professionChallenge(t.professions[profession].title)}</p>}
+        </fieldset>
         <button className="btn primary big" type="submit">{challenge && hasGame ? t.ui.challenge.accept : t.ui.welcome.start}</button>
         {challenge && hasGame && <button className="btn ghost big" type="button" onClick={onDismiss}>{t.ui.challenge.continue}</button>}
         {feedbackUrl && <a className="secondary-link feedback-link" href={feedbackUrl} target="_blank" rel="noreferrer" onClick={() => track('feedback-open')}>{t.ui.welcome.feedback}</a>}
@@ -142,7 +168,7 @@ export function WeekModal() {
               {t.ui.weekModal.freedomLead2(weeksAcc(modal.report.week))}
             </p>
             {challenge && <p className="challenge-comparison">{challengeComparison(modal.report.week, challenge)}</p>}
-            <ShareButton text={t.ui.shareFreedom(weeksAcc(modal.report.week))} />
+            <ShareButton />
             {dreamTitle && <div className="dream-unlocked">{t.ui.weekModal.dreamUnlocked(dreamTitle)}</div>}
           </>
         ) : (
@@ -171,27 +197,6 @@ export function WeekModal() {
       </div>
     </div>
   );
-}
-
-/** Если браузер запретил буфер обмена, ссылка остаётся доступна для ручного копирования. */
-export function ShareFallbackModal() {
-  const { t } = useI18n();
-  const content = useGame((s) => s.shareFallback);
-  const close = () => useGame.setState({ shareFallback: null });
-  useEffect(() => {
-    if (!content) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [content]);
-  if (!content) return null;
-  return <div className="modal-backdrop share-fallback" onClick={close}>
-    <div className="modal panel" role="dialog" aria-modal="true" aria-label={t.ui.challenge.copy} onClick={(e) => e.stopPropagation()}>
-      <p>{t.ui.challenge.downloadOnly}</p>
-      <textarea className="challenge-link" readOnly value={content} aria-label={t.ui.challenge.copy} onFocus={(e) => e.target.select()} autoFocus />
-      <button className="btn primary big" type="button" onClick={close}>{t.ui.challenge.close}</button>
-    </div>
-  </div>;
 }
 
 export function ToastView() {

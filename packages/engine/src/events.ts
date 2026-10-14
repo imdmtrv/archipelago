@@ -7,7 +7,7 @@ import type { DreamDef, EventParam, GameEvent, PlayerState, PlayerWeekReport, Wo
 
 /** Все id событий — чтобы UI мог подобрать иконки. */
 export type EventId =
-  | 'illness' | 'breakdown' | 'gift' | 'raise' | 'burnout'
+  | 'illness' | 'breakdown' | 'gift' | 'raise' | 'burnout' | 'layoff' | 'layoffOver'
   | 'storm' | 'stormDamage' | 'stormInsured' | 'fishShoal' | 'touristBoom' | 'crisis'
   | 'scamCollapse' | 'emergencyLoan' | 'freedom'
   | 'rumor' | 'rumorFalse' | 'goalDone' | 'neighborLoanReturned' | 'neighborLoanLate' | 'neighborLoanLost' | 'insuranceStarted'
@@ -64,6 +64,10 @@ export function rollPersonalEvent(player: PlayerState, rng: Rng): GameEvent | nu
       player.living += R.RAISE_LIVING;
       return event('raise', 'good', { salaryIncrease: R.RAISE_SALARY, livingIncrease: R.RAISE_LIVING });
     }
+    case 'layoff': {
+      if (!player.employed || player.layoffWeeks > 0) return null;
+      return event('layoff', 'bad', { weeks: rng.int(...R.LAYOFF_WEEKS), profession: player.profession });
+    }
   }
 }
 
@@ -72,7 +76,8 @@ export function rollPersonalEvent(player: PlayerState, rng: Rng): GameEvent | nu
  * + штраф за подработку.
  */
 export function weeklyHappinessDelta(player: PlayerState): number {
-  const drift = player.employed ? R.HAPPINESS_DRIFT : 0;
+  // Будни отнимают счастье только на работе: без работы и во время сокращения — нет
+  const drift = player.employed && player.layoffWeeks === 0 ? R.HAPPINESS_DRIFT : 0;
   return drift + happinessJoy(player) + (player.extraShift ? R.EXTRA_SHIFT_JOY : 0);
 }
 

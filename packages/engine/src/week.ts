@@ -1,6 +1,6 @@
 // Подсчёт итогов недели (шаги 2–8 из endWeek). Работает на уже скопированном мире.
 import { addLoan, returnToJob } from './actions';
-import { generateChoice, settleLent } from './choices';
+import { generateChoice, resolvePendingChoice, settleLent } from './choices';
 import { insuranceActive } from './engagement';
 import { settleGoals } from './goals';
 import {
@@ -30,9 +30,12 @@ function settlePlayer(world: WorldState, player: PlayerState, rng: Rng): PlayerW
   const events: GameEvent[] = [];
 
   // Без работы нет ни зарплаты, ни выгорания (ГПСЧ при этом не трогаем).
-  const burnout = player.employed && rollBurnout(player, rng);
+  const laidOff = player.layoffWeeks > 0;
+  const working = player.employed && !laidOff;
+  if (!working) player.extraShift = false;
+  const burnout = working && rollBurnout(player, rng);
   if (burnout) events.push(burnoutEvent());
-  const salary = player.employed
+  const salary = working
     ? Math.round(player.salary * (player.extraShift ? 1 + R.EXTRA_SHIFT_BONUS : 1) * (burnout ? R.BURNOUT_SALARY_MUL : 1))
     : 0;
 
@@ -49,10 +52,21 @@ function settlePlayer(world: WorldState, player: PlayerState, rng: Rng): PlayerW
   // Повышение меняет зарплату/расходы со следующей недели — уже после начислений выше.
   // Бросок личного события использует покрытие этой недели; оформление уже стоит премию.
   const eventPlayer = { ...player, insured: insuranceActive(player, week) };
-  const personal = rollPersonalEvent(eventPlayer, rng);
+  let personal = rollPersonalEvent(eventPlayer, rng);
+  if (personal?.id === 'layoff') {
+    if (player.lastLayoffWeek > 0 && week - player.lastLayoffWeek < R.LAYOFF_COOLDOWN) personal = null;
+    else {
+      player.layoffWeeks = Number(personal.params!.weeks);
+      player.lastLayoffWeek = week;
+    }
+  }
   player.salary = eventPlayer.salary;
   player.living = eventPlayer.living;
   if (personal) events.push(personal);
+  if (laidOff) {
+    player.layoffWeeks -= 1;
+    if (player.layoffWeeks === 0) events.push({ id: 'layoffOver', tone: 'good', params: {} });
+  }
   if (player.insured && week === player.insuranceFrom) events.push({ id: 'insuranceStarted', tone: 'good', params: {} });
   const eventsCash = events.reduce((sum, e) => sum + (e.cashDelta ?? 0), 0);
 
@@ -186,11 +200,16 @@ export function settleWeek(world: WorldState, news: NewsItem[]): WorldState {
   const endedWeek = world.week;
   const snapshot = snapshotMarket(world.market);
   for (const player of world.players) {
-    if (player.choice && player.choice.week <= endedWeek) player.choice = null;
+    if (player.choice && player.choice.week <= endedWeek) resolvePendingChoice(world, player, false);
   }
 
   const reports: Record<string, PlayerWeekReport> = {};
-  for (const player of world.players) reports[player.id] = settlePlayer(world, player, rng);
+  for (const player of world.players) {
+    reports[player.id] = settlePlayer(world, player, rng);
+    if (player.isBot && reports[player.id].events.some((e) => e.id === 'layoff')) {
+      news.push({ playerId: player.id, kind: 'layoff' });
+    }
+  }
 
   const worldEvents = rollWorldEvent(world, rng, reports);
   collapseScams(world, reports, news);

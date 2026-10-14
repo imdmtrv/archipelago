@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import {
   applyAction, assetViews, choiceView, createWorld, financeView, getPlayer, migrateWorld, ASSET_DEFS, DREAMS, DREAM_UPKEEP_UID,
-  type Action, type GameEvent, type WeekNewsItem, type WeekReport, type WorldState,
+  type Action, type GameEvent, type ProfessionId, type WeekNewsItem, type WeekReport, type WorldState,
 } from '@arch/engine';
 import type { DreamProgress, FloatLabel, PlacedItem, Weather } from './scene/contract';
 import { onAction, onWeek, onWeather, startGameSounds, stopGameSounds } from './audio/gameSounds';
 import { errorText, getI18n } from './i18n';
 import { validChallenge, validMoments, type ChallengeData, type Moment } from './challenge';
+import type { SharePayload } from './share';
 
 export const HUMAN = 'p1';
 const SAVE_KEY = new URLSearchParams(location.search).has('director') ? 'archipelago.director.save' : 'archipelago.save.v1';
@@ -43,7 +44,8 @@ function load(): Saved | null {
     const boughtDefIds = Array.isArray(saved?.boughtDefIds) ? saved.boughtDefIds.filter((id): id is string => typeof id === 'string' && Object.hasOwn(ASSET_DEFS, id))
       : [...new Set([...moments.filter((m) => m.kind === 'bought').map((m) => m.defId!), ...getPlayer(world, HUMAN).owned.map((a) => a.defId)])];
     return { world, news: Array.isArray(saved?.news) ? saved.news : [], history, moments, boughtDefIds,
-      challenge: validChallenge(saved?.challenge) && saved.challenge.seed === world.seed ? saved.challenge : null };
+      challenge: validChallenge(saved?.challenge) && saved.challenge.seed === world.seed
+        ? { ...saved.challenge, profession: saved.challenge.profession ?? 'teacher' } : null };
   } catch {
     return null;
   }
@@ -80,7 +82,7 @@ interface GameStore {
   /** Помним первую покупку даже после вытеснения её момента из короткой записи. */
   boughtDefIds: string[];
   challenge: ChallengeData | null;
-  shareFallback: string | null;
+  shareFallback: SharePayload | null;
   /** Чья карточка соседа открыта; null — ничья. */
   neighborId: string | null;
   floats: FloatLabel[];
@@ -93,7 +95,7 @@ interface GameStore {
   highlightUid: string | null;
   busy: boolean;
 
-  newGame(islandName: string, playerName: string, seed?: number, challenge?: ChallengeData | null): void;
+  newGame(islandName: string, playerName: string, seed?: number, challenge?: ChallengeData | null, profession?: ProfessionId): void;
   resetGame(): void;
   act(action: Exclude<Action, { type: 'endWeek' }>, success?: string): boolean;
   endWeek(): void;
@@ -149,10 +151,10 @@ export const useGame = create<GameStore>((set, get) => {
     highlightUid: null,
     busy: false,
 
-    newGame(islandName, playerName, seed, challenge = null) {
+    newGame(islandName, playerName, seed, challenge = null, profession = 'teacher') {
       clearTimers();
       if (get().world) stopGameSounds();
-      const world = createWorld({ seed: seed ?? Math.floor(Math.random() * 2 ** 31), playerName, islandName });
+      const world = createWorld({ seed: seed ?? Math.floor(Math.random() * 2 ** 31), playerName, islandName, profession: challenge?.profession ?? profession });
       const history = recordHistory({}, world);
       set({ world, news: [], history, moments: [], boughtDefIds: [], challenge, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, tab: 'deals', sheetOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
       save({ world, news: [], history, moments: [], boughtDefIds: [], challenge });

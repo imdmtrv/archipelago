@@ -109,7 +109,7 @@ const noUpgrades: Policy = makeSensible({ upgrades: false });
 const idle: Policy = () => null;
 /** Трудоголик: покупает как разумный, но каждую неделю на подработке и никогда не отдыхает. */
 const grinder: Policy = (world, me) => {
-  if (!me.extraShift) return { type: 'setExtraShift', playerId: me.id, on: true };
+  if (me.employed && me.layoffWeeks === 0 && !me.extraShift) return { type: 'setExtraShift', playerId: me.id, on: true };
   const action = sensible(world, { ...me, happiness: 100 });
   return action && action.type !== 'rest' ? action : null;
 };

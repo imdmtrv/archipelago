@@ -78,7 +78,7 @@ function insightFor(world: WorldState, p: PlayerState, views: AssetView[]): Insi
       text: t.ui.neighbors.insightFree(fmt(fin.passiveIncome), fmt(total), p.employed),
     };
   }
-  const salary = p.employed ? p.salary : 0;
+  const salary = fin.salary;
   const share = salary + fin.passiveIncome > 0 ? fin.passiveIncome / (salary + fin.passiveIncome) : 0;
   if (share >= 0.3) {
     return { tone: 'good', text: t.ui.neighbors.insightShare(percent(share)) };
@@ -182,7 +182,7 @@ export function NeighborCard({ playerId, onClose }: { playerId: string; onClose:
       <div className="nc-head">
         <RingAvatar letter={shown.name.slice(0, 1)} color={color} ratio={fin.freedomRatio} size={52} free={free} />
         <div>
-          <div className="nc-name">{shown.name} <span className="muted">· {t.ui.neighbors.island} {shown.islandName}</span></div>
+          <div className="nc-name">{shown.name} · {lowerFirst(t.professions[p.profession ?? 'teacher'].title)} <span className="muted">· {t.ui.neighbors.island} {shown.islandName}</span></div>
           <div className="nc-sub">{bot?.style ?? ''}{p.botStyle ? ' · ' : ''}{status}</div>
         </div>
       </div>

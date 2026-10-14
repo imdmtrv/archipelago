@@ -17,6 +17,7 @@ export function ActionsTab() {
   const premium = insurancePremium(me);
   const cost = studyCost(me);
   const shiftBonus = Math.round(me.salary * 0.5);
+  const laidOff = me.layoffWeeks > 0;
   const free = me.freedomWeek !== null;
   const newSalary = returnSalary(me.salary);
   const pct = (rate: number) => `${(rate * 100).toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 1 })}%`;
@@ -24,24 +25,24 @@ export function ActionsTab() {
   return (
     <div className="tab-body">
       <Section title={t.ui.actions.workRest}>
-        {me.employed && me.happiness < 30 && (
+        {me.employed && !laidOff && me.happiness < 30 && (
           <div className="warning">
             {t.ui.actions.burnout}
           </div>
         )}
         {me.employed ? (
-          <label className={`toggle-row ${me.restedThisWeek ? 'off' : ''}`}>
+          <label className={`toggle-row ${me.restedThisWeek || laidOff ? 'off' : ''}`}>
             <div>
               <b>{t.ui.actions.extraShift}</b>
               <span>
-                {me.restedThisWeek ? t.ui.actions.resting : t.ui.actions.shiftEffect(fmt(shiftBonus))}
+                {laidOff ? t.errors.shiftUnemployed : me.restedThisWeek ? t.ui.actions.resting : t.ui.actions.shiftEffect(fmt(shiftBonus))}
               </span>
             </div>
             <input
               type="checkbox"
               className="switch"
-              checked={me.extraShift}
-              disabled={me.restedThisWeek}
+              checked={me.extraShift && !laidOff}
+              disabled={me.restedThisWeek || laidOff}
               onChange={(e) => act({ type: 'setExtraShift', playerId: HUMAN, on: e.target.checked })}
             />
           </label>

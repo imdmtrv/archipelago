@@ -56,7 +56,7 @@ export const MARKET_PRICED_DEALS: readonly string[] = ['shares'];
 
 // ───────────── События ─────────────
 export const PERSONAL_EVENT_CHANCE = 0.32;
-export const PERSONAL_EVENT_WEIGHTS = { illness: 0.25, breakdown: 0.25, gift: 0.35, raise: 0.15 } as const;
+export const PERSONAL_EVENT_WEIGHTS = { illness: 0.25, breakdown: 0.25, gift: 0.35, raise: 0.15, layoff: 0.05 } as const;
 export const ILLNESS_COST: [number, number] = [40, 90];
 export const BREAKDOWN_COST: [number, number] = [30, 80];
 export const GIFT_AMOUNT: [number, number] = [50, 130];
@@ -107,9 +107,14 @@ export const NEIGHBOR_LOAN_DUE: [number, number] = [4, 8];     // через с�
 export const NEIGHBOR_LOAN_RETRY = 2;       // не смог — пробует снова через 2 недели…
 export const NEIGHBOR_LOAN_TRIES = 3;       // …всего 3 попытки, потом долг пропадает
 export const NEIGHBOR_LOAN_JOY = 4;         // помочь соседу приятно
+export const NEIGHBOR_ASK_AFTER_DECLINE = 20; // после отказа сосед не просит столько недель
 export const FIRE_SALE_DISCOUNT: [number, number] = [0.6, 0.75]; // сосед в беде отдаёт актив за 60–75% своей цены
 export const FIRE_SALE_TROUBLE_CASH = 150;  // «в беде» — заём у ростовщика или наличных меньше этого
 export const BUYER_PREMIUM: [number, number] = [1.2, 1.45]; // покупатель предлагает 120–145% уплаченной цены
 
 // ───────────── Цели ─────────────
 export const GOALS_ACTIVE = 3;              // столько целей видно одновременно
+
+// ───────────── Сокращение ─────────────
+export const LAYOFF_WEEKS: [number, number] = [3, 3]; // столько недель без зарплаты
+export const LAYOFF_COOLDOWN = 30;          // не чаще одного сокращения за 30 недель

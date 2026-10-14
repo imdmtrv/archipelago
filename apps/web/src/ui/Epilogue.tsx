@@ -3,7 +3,7 @@ import { financeView, getPlayer, leaderboard } from '@arch/engine';
 import { HUMAN, useGame, type WeekModal } from '../store';
 import { Confetti, ConfirmButton, Meter } from './common';
 import { levelTitle, percent } from './text';
-import { displayPlayer, getI18n, useI18n, weeksAcc } from '../i18n';
+import { displayPlayer, getI18n, useI18n } from '../i18n';
 import { ShareButton } from './ShareButton';
 import { track } from '../analytics';
 
@@ -91,7 +91,7 @@ export function EpilogueModal({ modal }: { modal: WeekModal }) {
           <ConfirmButton className="btn ghost big" confirmText={t.ui.epilogue.resetConfirm} onConfirm={resetGame}>
             {t.ui.epilogue.newGame}
           </ConfirmButton>
-          <ShareButton className="btn ghost big" text={t.ui.shareEpilogue(weeksAcc(me.freedomWeek ?? modal.report.week), weeksAcc(dreamWeek))} />
+          <ShareButton className="btn ghost big" />
         </div>
         {feedbackUrl && <a className="secondary-link feedback-link" href={feedbackUrl} target="_blank" rel="noreferrer" onClick={() => track('feedback-open')}>{t.ui.welcome.feedback}</a>}
       </div>
