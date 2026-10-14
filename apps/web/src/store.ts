@@ -7,6 +7,7 @@ import type { DreamProgress, FloatLabel, PlacedItem, Weather } from './scene/con
 import { onAction, onWeek, onWeather, startGameSounds, stopGameSounds } from './audio/gameSounds';
 import { errorText, getI18n } from './i18n';
 import { validChallenge, validMoments, type ChallengeData, type Moment } from './challenge';
+import type { SharePayload } from './share';
 
 export const HUMAN = 'p1';
 const SAVE_KEY = new URLSearchParams(location.search).has('director') ? 'archipelago.director.save' : 'archipelago.save.v1';
@@ -81,7 +82,7 @@ interface GameStore {
   /** Помним первую покупку даже после вытеснения её момента из короткой записи. */
   boughtDefIds: string[];
   challenge: ChallengeData | null;
-  shareFallback: { blob: Blob; message: string; url: string } | null;
+  shareFallback: SharePayload | null;
   /** Чья карточка соседа открыта; null — ничья. */
   neighborId: string | null;
   floats: FloatLabel[];

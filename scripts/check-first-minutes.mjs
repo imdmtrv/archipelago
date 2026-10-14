@@ -178,7 +178,12 @@ try {
   });
   await shared.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
   let data = await sharedData();
-  assert.equal(data.title, 'Архипелаг'); assert.match(data.text, /^Финансовая свобода за 21 неделю в «Архипелаге»/); assert.match(data.text, /на моём острове «/); assert.match(data.url, /\?c=[\w-]+$/);
+  assert.equal(data.title, 'Архипелаг'); assert.match(data.text, /^Финансовая свобода за 21 неделю в «Архипелаге»/); assert.match(data.text, /Сможешь быстрее\?\nСыграй на моём острове →$/); assert.match(data.url, /\?c=[\w-]+$/);
+  assert.equal(await shared.evaluate(async (href) => {
+    const { decodeChallenge } = await import('/src/challenge.ts');
+    const decoded = decodeChallenge(new URL(href).searchParams.get('c'));
+    return decoded?.v === 2 && decoded.name === 'Друг';
+  }, data.url), true);
   assert.deepEqual(data.files, ['image/png']);
   await shared.evaluate(async () => {
     const { useGame } = await import('/src/store.ts'); const state = useGame.getState(); const world = structuredClone(state.world);
@@ -218,6 +223,27 @@ try {
     const challenge = { v:1, seed:world.seed, profession:'teacher', name:'Дима', island:'Тихая Гавань', week:26, freedomWeek:26, progress:Array(26).fill(100), moments:[] };
     useGame.setState({world,challenge,modal:{report:{week:23,worldEvents:[],players:{p1:mine},news:[]},events:[],freedom:true,epilogue:false}});
   });
+  const codec = await clipPage.evaluate(async () => {
+    const { encodeChallenge, decodeChallenge, ghostProgress } = await import('/src/challenge.ts');
+    const legacy = { v:1, seed:0xffffffff, profession:'captain', name:'Дима', island:'Тихая Гавань', week:40, freedomWeek:40,
+      progress:Array.from({length:40}, (_, i) => i * 4), moments:[
+        {week:2,kind:'bought',defId:'boat'}, {week:4,kind:'upgraded',defId:'boat',level:2},
+        {week:6,kind:'bought',defId:'smokehouse'}, {week:8,kind:'upgraded',defId:'smokehouse',level:2},
+        {week:10,kind:'bought',defId:'cottage'}, {week:12,kind:'upgraded',defId:'cottage',level:2},
+        {week:14,kind:'bought',defId:'cafe'}, {week:40,kind:'freedom'},
+      ] };
+    const code = encodeChallenge({...legacy,v:2}), decoded = decodeChallenge(code);
+    const long = decodeChallenge(encodeChallenge({...legacy,v:2,name:'Я'.repeat(20),island:'О'.repeat(24)}));
+    return { legacy:JSON.stringify(decodeChallenge(encodeChallenge(legacy))) === JSON.stringify(legacy),
+      length:code.length, v:decoded?.v, seed:decoded?.seed, profession:decoded?.profession,
+      moments:decoded?.moments, middle:decoded && ghostProgress(decoded, 2),
+      long:long && [long.name, long.island],
+      invalid:['', '!', 'A', code.slice(0,-1), code + 'AA'].every((code) => decodeChallenge(code) === null) };
+  });
+  assert.equal(codec.legacy, true); assert.equal(codec.v, 2); assert.equal(codec.seed, 0xffffffff);
+  assert.equal(codec.profession, 'captain'); assert(codec.length <= 150);
+  assert.equal(codec.moments.length, 8); assert.equal(codec.moments.at(-1).kind, 'freedom');
+  assert.equal(codec.middle, 4); assert.deepEqual(codec.long, ['Я'.repeat(12), 'О'.repeat(16)]); assert.equal(codec.invalid, true);
   await clipPage.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
   // На компьютере системное меню не вызывается даже при поддержке отправки файлов.
   const dialog = clipPage.getByRole('dialog', { name: 'Бросить вызов другу', exact: true });
@@ -225,12 +251,23 @@ try {
   assert.equal(await clipPage.evaluate(() => !!window.__nativeShare), false);
   await dialog.locator('img').evaluate((img) => img.decode());
   assert.deepEqual(await dialog.locator('img').evaluate((img) => [img.naturalWidth, img.naturalHeight]), [1080, 1350]);
-  const content = await dialog.getByRole('textbox').inputValue();
-  assert.match(content, /^Финансовая свобода за 23 недели в «Архипелаге»/);
+  const messageField = dialog.getByRole('textbox', { name:'Скопировать сообщение', exact:true });
+  assert.equal(await dialog.getByRole('textbox', { name:'Имя на карточке', exact:true }).inputValue(), '');
+  assert.match(await messageField.inputValue(), /^Финансовая свобода за 23 недели в «Архипелаге»/);
+  await dialog.getByRole('textbox', { name:'Имя на карточке', exact:true }).fill('Анна');
+  await dialog.getByRole('button', { name:'она', exact:true }).click();
+  assert.equal(await dialog.getByRole('button', { name:'она', exact:true }).getAttribute('aria-pressed'), 'true');
+  await clipPage.waitForFunction(() => document.querySelector('.share-dialog textarea')?.value.startsWith('Я обрела финансовую свободу'));
+  const content = await messageField.inputValue();
+  assert.match(content, /^Я обрела финансовую свободу за 23 недели в «Архипелаге»/);
   assert.match(content, /На 3 недели быстрее, чем Дима\./);
   assert.match(content, /\?c=[\w-]+$/);
-  assert.equal(await dialog.getByRole('textbox').getAttribute('readonly'), '');
+  assert.equal(await messageField.getAttribute('readonly'), '');
   const challengeUrl = content.split('\n').at(-1);
+  assert.equal(await clipPage.evaluate(async (href) => {
+    const { decodeChallenge } = await import('/src/challenge.ts');
+    return decodeChallenge(new URL(href).searchParams.get('c'))?.name;
+  }, challengeUrl), 'Анна');
   for (const [name, base, urlKey, textKey] of [
     ['Telegram', 'https://t.me/share/url', 'url', 'text'],
     ['ВКонтакте', 'https://vk.com/share.php', 'url', 'title'],
@@ -241,10 +278,23 @@ try {
     if (urlKey) assert.equal(href.searchParams.get(urlKey), challengeUrl);
     assert.equal(href.searchParams.get(textKey), urlKey ? content.slice(0, -(challengeUrl.length + 1)) : content);
   }
-  await dialog.getByRole('button', { name: 'Скопировать ссылку', exact:true }).click();
-  await clipPage.getByRole('status').filter({ hasText:'Текст со ссылкой скопирован' }).waitFor();
+  await dialog.getByRole('button', { name: 'Скопировать сообщение', exact:true }).click();
+  await clipPage.getByRole('status').filter({ hasText:'Сообщение скопировано — ссылка спрятана в словах «Сыграй на моём острове»' }).waitFor();
   // Буфер Windows отдаёт переводы строк как \r\n
   assert.equal((await clipPage.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), content);
+  const copiedLink = await clipPage.evaluate(async () => {
+    const item = (await navigator.clipboard.read()).find((item) => item.types.includes('text/html'));
+    const html = new DOMParser().parseFromString(await (await item.getType('text/html')).text(), 'text/html');
+    const link = html.querySelector('a'); return [link?.textContent, link?.href];
+  });
+  assert.deepEqual(copiedLink, ['Сыграй на моём острове →', challengeUrl]);
+  // Без HTML-буфера остаётся обычный текст с короткой ссылкой.
+  await clipPage.evaluate(() => { window.__clipboardWrite = navigator.clipboard.write.bind(navigator.clipboard);
+    Object.defineProperty(navigator.clipboard, 'write', { configurable:true, value:() => Promise.reject(new Error('No HTML')) }); });
+  await dialog.getByRole('button', { name: 'Скопировать сообщение', exact:true }).click();
+  await clipPage.getByRole('status').filter({ hasText:'Сообщение со ссылкой скопировано' }).waitFor();
+  assert.equal((await clipPage.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), content);
+  await clipPage.evaluate(() => Object.defineProperty(navigator.clipboard, 'write', { configurable:true, value:window.__clipboardWrite }));
   await dialog.getByRole('button', { name: 'Скопировать картинку', exact:true }).click();
   await clipPage.getByRole('status').filter({ hasText:'Картинка скопирована — вставьте её в чат (Ctrl+V)' }).waitFor();
   assert(await clipPage.evaluate(async () => (await navigator.clipboard.read()).some((item) => item.types.includes('image/png'))));
@@ -255,15 +305,18 @@ try {
     Object.defineProperty(navigator.clipboard, 'writeText', { configurable:true, value:() => Promise.reject(new Error('Denied')) });
     Object.defineProperty(navigator.clipboard, 'write', { configurable:true, value:() => Promise.reject(new Error('Denied')) });
   });
-  for (const name of ['Скопировать ссылку', 'Скопировать картинку']) {
+  for (const name of ['Скопировать сообщение', 'Скопировать картинку']) {
     await dialog.getByRole('button', { name, exact:true }).click();
     await clipPage.getByRole('status').filter({ hasText:'Не получилось скопировать — выделите текст в поле и скопируйте вручную' }).waitFor();
-    assert.equal(await dialog.getByRole('textbox').inputValue(), content);
+    assert.equal(await messageField.inputValue(), content);
   }
   await clipPage.keyboard.press('Escape');
   await dialog.waitFor({ state:'hidden' });
   assert.equal(await clipPage.locator('.freedom-modal').count(), 1, 'Escape closed the underlying result');
   await clipPage.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
+  await dialog.waitFor();
+  assert.equal(await dialog.getByRole('textbox', { name:'Имя на карточке', exact:true }).inputValue(), 'Анна');
+  assert.equal(await dialog.getByRole('button', { name:'она', exact:true }).getAttribute('aria-pressed'), 'true');
   await dialog.getByRole('button', { name:'Закрыть', exact:true }).click();
   await dialog.waitFor({ state:'hidden' });
   await clip.close();
