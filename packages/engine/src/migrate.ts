@@ -1,6 +1,6 @@
-// Миграция сохранений: старые версии последовательно приводятся к текущей v6.
+// Миграция сохранений: старые версии последовательно приводятся к текущей v7.
 // Вход — «сырой» JSON из localStorage, поэтому всё проверяем руками; непонятное — null.
-import { DREAMS, GOALS } from './content';
+import { DREAMS, GOALS, PROFESSIONS } from './content';
 import { newGoalsState } from './goals';
 import type { WorldState } from './types';
 import { newDreamState } from './world';
@@ -116,7 +116,7 @@ function isWorldBase(raw: unknown): raw is Obj & { players: unknown[] } {
 }
 
 /**
- * Принимает сохранённый мир версии 1–6 и возвращает мир версии 6 (копию, вход не меняется).
+ * Принимает сохранённый мир версии 1–7 и возвращает мир версии 7 (копию, вход не меняется).
  * Версия 1 сначала становится версией 2: игрок-человек (первый, не бот) получает чистую мечту,
  * все остаются на работе, уже достигнутая свобода считается первым уровнем.
  * Версия 2 становится версией 3: всё купленное — первого уровня. Всё непонятное — null.
@@ -124,7 +124,7 @@ function isWorldBase(raw: unknown): raw is Obj & { players: unknown[] } {
 export function migrateWorld(raw: unknown): WorldState | null {
   if (!isWorldBase(raw)) return null;
   const version = raw.version;
-  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6) return null;
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6 && version !== 7) return null;
 
   let world: Obj;
   try {
@@ -146,6 +146,12 @@ export function migrateWorld(raw: unknown): WorldState | null {
       }
       world.version = 6;
     }
+    if (version === 7) {
+      if (!(players as Obj[]).every((p) => typeof p.profession === 'string'
+        && Object.hasOwn(PROFESSIONS, p.profession)
+        && isNum(p.layoffWeeks) && Number.isInteger(p.layoffWeeks) && p.layoffWeeks >= 0
+        && isNum(p.lastLayoffWeek) && Number.isInteger(p.lastLayoffWeek) && p.lastLayoffWeek >= 0)) return null;
+    } else v6ToV7(world);
     return world as unknown as WorldState;
   }
 
@@ -164,8 +170,18 @@ export function migrateWorld(raw: unknown): WorldState | null {
     p.goals = p.isBot ? null : newGoalsState();
   }
   world.upcoming = [];
-  world.version = 6;
+  v6ToV7(world);
   return world as unknown as WorldState;
+}
+
+/** 6 → 7: до профессий у всех были числа учителя — им и остаются; зарплата, расходы и деньги сохраняются. */
+function v6ToV7(world: Obj): void {
+  for (const p of world.players as Obj[]) {
+    p.profession = 'teacher';
+    p.layoffWeeks = 0;
+    p.lastLayoffWeek = 0;
+  }
+  world.version = 7;
 }
 
 function isPlayerEngagement(value: unknown, version: number): boolean {

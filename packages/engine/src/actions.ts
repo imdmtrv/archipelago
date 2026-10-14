@@ -141,7 +141,7 @@ const setInsurance: Handler<Extract<PlayerAction, { type: 'setInsurance' }>> = (
 };
 
 const setExtraShift: Handler<Extract<PlayerAction, { type: 'setExtraShift' }>> = (_world, player, action) => {
-  if (action.on && !player.employed) return err('shiftUnemployed');
+  if (action.on && (!player.employed || player.layoffWeeks > 0)) return err('shiftUnemployed');
   if (action.on && player.restedThisWeek) return err('shiftAfterRest');
   player.extraShift = action.on;
   return null;
@@ -181,6 +181,7 @@ const quitJob: Handler<Extract<PlayerAction, { type: 'quitJob' }>> = (_world, pl
   if (player.freedomWeek === null) return err('quitBeforeFreedom');
   if (!player.employed) return err('alreadyQuit');
   player.employed = false;
+  player.layoffWeeks = 0;
   player.extraShift = false;
   player.threatWeeks = 0;
   return null;

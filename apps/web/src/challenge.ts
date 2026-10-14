@@ -1,10 +1,11 @@
-import { ASSET_DEFS, DREAMS, FREEDOM_LEVEL_RATIOS } from '@arch/engine';
+import { ASSET_DEFS, DREAMS, FREEDOM_LEVEL_RATIOS, PROFESSION_ORDER, type ProfessionId } from '@arch/engine';
 
 export type MomentKind = 'bought' | 'upgraded' | 'freedom' | 'freedomLevel' | 'dreamStage' | 'dreamDone';
 export interface Moment { week: number; kind: MomentKind; defId?: string; level?: number }
 export interface ChallengeData {
   v: 1;
   seed: number;
+  profession: ProfessionId;
   name: string;
   island: string;
   week: number;
@@ -39,16 +40,19 @@ export function validMoments(value: unknown, week = MAX_CHALLENGE_WEEKS): value 
   });
 }
 
-export function validChallenge(value: unknown): value is ChallengeData {
-  if (!object(value) || !keys(value, ['v', 'seed', 'name', 'island', 'week', 'freedomWeek', 'progress', 'moments'])) return false;
+type ChallengePayload = Omit<ChallengeData, 'profession'> & { profession?: ProfessionId };
+
+export function validChallenge(value: unknown): value is ChallengePayload {
+  if (!object(value) || !keys(value, ['v', 'seed', 'profession', 'name', 'island', 'week', 'freedomWeek', 'progress', 'moments'])) return false;
   return value.v === 1 && integer(value.seed, 0, 2 ** 32 - 1) && label(value.name, 20) && label(value.island, 24)
+    && (value.profession === undefined || PROFESSION_ORDER.some((id) => id === value.profession))
     && integer(value.week, 1, MAX_CHALLENGE_WEEKS)
     && (value.freedomWeek === null || integer(value.freedomWeek, 1, value.week))
     && Array.isArray(value.progress) && value.progress.length === value.week
     && value.progress.every((p) => integer(p, 0, 99999)) && validMoments(value.moments, value.week);
 }
 
-export function encodeChallenge(data: ChallengeData): string {
+export function encodeChallenge(data: ChallengePayload): string {
   if (!validChallenge(data)) throw new Error('Invalid challenge');
   const bytes = new TextEncoder().encode(JSON.stringify(data));
   const code = btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -61,7 +65,7 @@ export function decodeChallenge(code: string): ChallengeData | null {
     if (!code || code.length > MAX_CODE_LENGTH || code.length % 4 === 1 || !/^[A-Za-z0-9_-]+$/.test(code)) return null;
     const raw = atob(code.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - code.length % 4) % 4));
     const data: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(raw, (c) => c.charCodeAt(0))));
-    return validChallenge(data) && encodeChallenge(data) === code ? data : null;
+    return validChallenge(data) && encodeChallenge(data) === code ? { ...data, profession: data.profession ?? 'teacher' } : null;
   } catch { return null; }
 }
 

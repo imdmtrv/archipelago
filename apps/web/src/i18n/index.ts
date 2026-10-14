@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GOALS, type EngineError, type GameEvent, type GoalReward, type PlayerState, type RumorView, type Sector, type SlotType, type WeekNewsItem } from '@arch/engine';
+import { GOALS, PROFESSION_ORDER, type ProfessionId, type EngineError, type GameEvent, type GoalReward, type PlayerState, type RumorView, type Sector, type SlotType, type WeekNewsItem } from '@arch/engine';
 import { ru, type Dict } from './ru';
 import { en } from './en';
 import type { ChallengeData, Moment } from '../challenge';
@@ -205,6 +205,11 @@ export function eventCopy(event: GameEvent, players: readonly PlayerState[] = []
   const { t } = getI18n();
   const p = event.params ?? {};
   switch (event.id) {
+    case 'layoff': {
+      const profession = PROFESSION_ORDER.includes(p.profession as ProfessionId) ? p.profession as ProfessionId : 'teacher';
+      return { title: t.events.layoff.title, text: t.events.layoff.text(t.events.layoff.reason[profession], weeksAcc(Number(p.weeks))) };
+    }
+    case 'layoffOver': return t.events.layoffOver;
     case 'rumor': {
       const kind = String(p.kind) as RumorView['kind'];
       const source = p.source === 'gossip' ? 'gossip' : 'reliable';
@@ -278,6 +283,7 @@ export function newsText(item: WeekNewsItem, players: readonly PlayerState[]): s
   const name = newsPlayer(item.playerId, players);
   const female = femaleBot(item.playerId);
   switch (item.kind) {
+    case 'layoff': return t.news.layoff(name);
     case 'bought': return t.news.bought(name, female, assetCopy(item.defId).accusative);
     case 'sold': return t.news.sold(name, female, assetCopy(item.defId, item.level).accusative);
     case 'upgraded': return t.news.upgraded(name, female, assetCopy(item.defId, item.fromLevel).accusative, assetCopy(item.defId, item.fromLevel + 1).title);

@@ -30,7 +30,7 @@ function shownFreedomRatio(player: PlayerState, market: MarketState): number {
 
 export function financeView(world: WorldState, playerId: string): FinanceView {
   const player = getPlayer(world, playerId);
-  const salary = player.employed
+  const salary = player.employed && player.layoffWeeks === 0
     ? Math.round(player.salary * (player.extraShift ? 1 + R.EXTRA_SHIFT_BONUS : 1))
     : 0;
   const passive = passiveIncome(player, world.market);

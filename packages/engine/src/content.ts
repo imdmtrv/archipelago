@@ -164,10 +164,10 @@ export const GOALS: GoalDef[] = [
  * Числа — стартовые для подбора симулятором (пределы — в docs/specs/professions.md). Учитель — прежние 180 / 150 / 600.
  */
 export const PROFESSIONS: Record<ProfessionId, ProfessionDef> = {
-  keeper: { id: 'keeper', salary: 130, living: 100, cash: 400, loan: 0 },
+  keeper: { id: 'keeper', salary: 125, living: 100, cash: 400, loan: 0 },
   teacher: { id: 'teacher', salary: 180, living: 150, cash: 600, loan: 0 },
-  captain: { id: 'captain', salary: 260, living: 220, cash: 700, loan: 0 },
-  doctor: { id: 'doctor', salary: 360, living: 270, cash: 400, loan: 1500 },
+  captain: { id: 'captain', salary: 300, living: 260, cash: 875, loan: 0 },
+  doctor: { id: 'doctor', salary: 420, living: 320, cash: 700, loan: 1750 },
 };
 
 /** Порядок карточек на старте. */

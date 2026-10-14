@@ -235,6 +235,7 @@ export type WeekNewsItem =
   | { playerId: string; kind: 'scam'; defId?: string }
   | { playerId: string; kind: 'freedom'; week: number }
   | { playerId: string; kind: 'dreamDone' }
+  | { playerId: string; kind: 'layoff' }
   | { playerId: string; kind: 'legacy'; legacyText: string };
 
 export interface PlayerWeekReport {

@@ -12,7 +12,7 @@ export function currentChallenge(): ChallengeData | null {
   if (!world || week < 1 || week > MAX_CHALLENGE_WEEKS) return null;
   const me = getPlayer(world, HUMAN), shown = displayPlayer(me);
   const points = new Map((history[HUMAN] ?? []).map((p) => [p.week, p.ratio]));
-  return { v: 1, seed: world.seed, name: shown.name, island: shown.islandName, week, freedomWeek: me.freedomWeek,
+  return { v: 1, seed: world.seed, profession: me.profession, name: shown.name, island: shown.islandName, week, freedomWeek: me.freedomWeek,
     progress: Array.from({ length: week }, (_, i) => Math.max(0, Math.min(99999, Math.round((points.get(i + 1) ?? 0) * 100)))),
     moments: moments.filter((m) => m.week <= week) };
 }

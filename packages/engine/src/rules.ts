@@ -56,7 +56,7 @@ export const MARKET_PRICED_DEALS: readonly string[] = ['shares'];
 
 // ───────────── События ─────────────
 export const PERSONAL_EVENT_CHANCE = 0.32;
-export const PERSONAL_EVENT_WEIGHTS = { illness: 0.25, breakdown: 0.25, gift: 0.35, raise: 0.15 } as const;
+export const PERSONAL_EVENT_WEIGHTS = { illness: 0.25, breakdown: 0.25, gift: 0.35, raise: 0.15, layoff: 0.05 } as const;
 export const ILLNESS_COST: [number, number] = [40, 90];
 export const BREAKDOWN_COST: [number, number] = [30, 80];
 export const GIFT_AMOUNT: [number, number] = [50, 130];
@@ -115,6 +115,5 @@ export const BUYER_PREMIUM: [number, number] = [1.2, 1.45]; // покупате�
 export const GOALS_ACTIVE = 3;              // столько целей видно одновременно
 
 // ───────────── Сокращение ─────────────
-// Личное событие `layoff` с весом 0.06 в PERSONAL_EVENT_WEIGHTS (добавляет исполнитель движка).
-export const LAYOFF_WEEKS: [number, number] = [3, 6]; // столько недель без зарплаты
+export const LAYOFF_WEEKS: [number, number] = [3, 3]; // столько недель без зарплаты
 export const LAYOFF_COOLDOWN = 30;          // не чаще одного сокращения за 30 недель

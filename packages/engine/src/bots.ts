@@ -79,7 +79,7 @@ const saver: Policy = (world, me) => {
     ?? restIfTired(me, 24, SAVER_BUFFER)
     ?? saverInvest(world, me)
     // Пока силы есть — берёт подработку и откладывает.
-    ?? (me.happiness >= SAVER_SHIFT_MOOD && !me.extraShift && !me.restedThisWeek
+    ?? (me.employed && me.layoffWeeks === 0 && me.happiness >= SAVER_SHIFT_MOOD && !me.extraShift && !me.restedThisWeek
       ? { type: 'setExtraShift', playerId: me.id, on: true } : null);
 };
 

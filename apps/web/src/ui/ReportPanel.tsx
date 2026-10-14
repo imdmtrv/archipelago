@@ -2,7 +2,7 @@ import { assetViews, financeView, getPlayer, FREEDOM_LEVEL_RATIOS, THREAT_WEEKS 
 import { HUMAN, useGame } from '../store';
 import { Meter, Pips } from './common';
 import { lowerFirst, percent } from './text';
-import { levelGenitive, levelTitle, useI18n, weeks } from '../i18n';
+import { levelGenitive, levelTitle, useI18n, weeks, weeksAcc } from '../i18n';
 import { ShareButton } from './ShareButton';
 
 /** До свободы шкала 0–100%; после — шкала запаса до последнего уровня, с отметками уровней. */
@@ -103,8 +103,9 @@ export function Statement() {
       <div className="st-group">
         <div className="st-title">{t.ui.report.incomeWeek}</div>
         {me.employed
-          ? <Row label={me.extraShift ? t.ui.report.salaryShift : t.ui.report.salary} value={fin.salary} tone="pos" />
+          ? <Row label={`${me.extraShift && me.layoffWeeks === 0 ? t.ui.report.salaryShift : t.ui.report.salary} · ${lowerFirst(t.professions[me.profession ?? 'teacher'].title)}`} value={fin.salary} tone="pos" />
           : <Row label={t.ui.report.noJob} value={0} muted />}
+        {me.layoffWeeks > 0 && <div className="st-note neg">{t.ui.report.layoff(weeksAcc(me.layoffWeeks))}</div>}
         <Row label={`${t.ui.report.assets}${incomeCount ? ` (${incomeCount})` : ''}`} value={fin.passiveIncome} tone="pos" />
       </div>
       <div className="st-group">
@@ -116,7 +117,7 @@ export function Statement() {
       </div>
       <Row label={t.ui.report.net} value={fin.net} tone={fin.net >= 0 ? 'pos' : 'neg'} strong />
       {fin.net < 0 && <div className="st-note neg">{t.ui.report.negative}</div>}
-      {me.employed && me.happiness < 30 && <div className="st-note neg">{t.ui.report.burnout}</div>}
+      {me.employed && !(me.layoffWeeks > 0) && me.happiness < 30 && <div className="st-note neg">{t.ui.report.burnout}</div>}
 
       <div className="capital">
         <div><span>{t.ui.cash}</span><b>{fmt(me.cash)}</b></div>
