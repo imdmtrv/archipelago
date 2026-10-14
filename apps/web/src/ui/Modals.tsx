@@ -168,7 +168,7 @@ export function WeekModal() {
               {t.ui.weekModal.freedomLead2(weeksAcc(modal.report.week))}
             </p>
             {challenge && <p className="challenge-comparison">{challengeComparison(modal.report.week, challenge)}</p>}
-            <ShareButton text={t.ui.shareFreedom(weeksAcc(modal.report.week))} />
+            <ShareButton />
             {dreamTitle && <div className="dream-unlocked">{t.ui.weekModal.dreamUnlocked(dreamTitle)}</div>}
           </>
         ) : (
@@ -197,27 +197,6 @@ export function WeekModal() {
       </div>
     </div>
   );
-}
-
-/** Если браузер запретил буфер обмена, ссылка остаётся доступна для ручного копирования. */
-export function ShareFallbackModal() {
-  const { t } = useI18n();
-  const content = useGame((s) => s.shareFallback);
-  const close = () => useGame.setState({ shareFallback: null });
-  useEffect(() => {
-    if (!content) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [content]);
-  if (!content) return null;
-  return <div className="modal-backdrop share-fallback" onClick={close}>
-    <div className="modal panel" role="dialog" aria-modal="true" aria-label={t.ui.challenge.copy} onClick={(e) => e.stopPropagation()}>
-      <p>{t.ui.challenge.downloadOnly}</p>
-      <textarea className="challenge-link" readOnly value={content} aria-label={t.ui.challenge.copy} onFocus={(e) => e.target.select()} autoFocus />
-      <button className="btn primary big" type="button" onClick={close}>{t.ui.challenge.close}</button>
-    </div>
-  </div>;
 }
 
 export function ToastView() {

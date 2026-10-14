@@ -81,7 +81,7 @@ interface GameStore {
   /** Помним первую покупку даже после вытеснения её момента из короткой записи. */
   boughtDefIds: string[];
   challenge: ChallengeData | null;
-  shareFallback: string | null;
+  shareFallback: { blob: Blob; message: string; url: string } | null;
   /** Чья карточка соседа открыта; null — ничья. */
   neighborId: string | null;
   floats: FloatLabel[];

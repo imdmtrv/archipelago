@@ -528,9 +528,52 @@ describe('цели', () => {
     const uid = player(world).loans[0].uid;
     world = applyAction(world, { type: 'repayLoan', playerId: 'p1', loanUid: uid, amount: 100 }).world;
     settleGoals(world, player(world), emptyReport());
-    expect(player(world).goals!.active).toEqual(['debtFree']);
-    settleGoals(world, player(world), emptyReport());
+    expect(player(world).goals!.active).toEqual([]);
     expect(player(world).goals!.done.at(-1)?.id).toBe('debtFree');
+  });
+
+  it.each([45, 1000])('засчитывает цепочку новых достигнутых целей в ту же неделю после settleWeek (доход %i)', (income) => {
+    const world = soloWorld();
+    const me = player(world);
+    me.knowledge = 1;
+    me.happiness = 50;
+    me.living = 100;
+    me.goals!.calmWeeks = 14;
+    me.goals!.insuredStorm = true;
+    me.goals!.hadLoan = true;
+    giveAsset(world, 'p1', 'boat', { income, upkeep: 0, level: 2 });
+    giveAsset(world, 'p1', 'bungalow', { income, upkeep: 0 });
+    giveAsset(world, 'p1', 'deposit', { income, upkeep: 0 });
+    const endedWeek = world.week;
+    const result = settleWeek(world, []);
+    const settled = player(result);
+    const report = result.lastReport!.players.p1;
+    const done = settled.goals!.done;
+    const completed = GOALS.filter((g) => income === 1000 || g.id !== 'level150');
+    expect(done.map((g) => g.id)).toEqual(completed.map((g) => g.id));
+    expect(done.every((g) => g.week === endedWeek)).toBe(true);
+    expect(report.events.filter((e) => e.id === 'goalDone').map((e) => [e.params?.goalId, e.cashDelta]))
+      .toEqual(completed.map((g) => [g.id, g.reward.cash]));
+    expect(settled.goals!.active).toEqual(income === 1000 ? [] : ['level150']);
+    expect(settled.goals!.active.every((id) => {
+      const progress = goalProgress(result, settled, id);
+      return progress.value < progress.target;
+    })).toBe(true);
+    const cash = settled.cash;
+    settleGoals(result, settled, emptyReport());
+    expect(settled.cash).toBe(cash);
+  });
+
+  it('повторно проверяет активную подушку после награды', () => {
+    const world = soloWorld(), me = player(world);
+    me.cash = 3 * weeklyExpenses(me).total - GOALS[0].reward.cash;
+    me.knowledge = 1;
+    settleGoals(world, me, emptyReport());
+    expect(me.goals!.done.map((g) => g.id)).toEqual(['study', 'cushion']);
+    expect(me.goals!.active.every((id) => {
+      const progress = goalProgress(world, me, id);
+      return progress.value < progress.target;
+    })).toBe(true);
   });
 
   it('считает все расходы, три настоящих сектора и настоящий пассив; проценты целые', () => {
@@ -565,7 +608,7 @@ describe('цели', () => {
     report.events.push({ id: 'emergencyLoan', tone: 'bad' });
     settleGoals(world, me, report);
     expect(me.goals!.calmWeeks).toBe(0);
-    expect(me.goals!.done.map((g) => g.id)).toEqual(['insuredStorm']);
+    expect(me.goals!.done.map((g) => g.id)).toEqual(['insuredStorm', 'cushion']);
     expect(me.happiness).toBe(100);
     settleGoals(world, me, emptyReport());
     expect(me.goals!.calmWeeks).toBe(1);

@@ -3,7 +3,8 @@ import { IslandScene } from './scene/IslandScene';
 import { dreamProgress, placedItems, useGame } from './store';
 import { TopBar } from './ui/TopBar';
 import { DesktopLayout, MobileLayout, useMediaQuery } from './ui/Panels';
-import { ShareFallbackModal, ToastView, WeekModal, WelcomeModal } from './ui/Modals';
+import { ToastView, WeekModal, WelcomeModal } from './ui/Modals';
+import { ShareDialog } from './ui/ShareDialog';
 import { NeighborModal } from './ui/Neighbors';
 import { ChoiceModal } from './ui/ChoiceModal';
 import { FeedbackPrompt } from './ui/FeedbackPrompt';
@@ -84,7 +85,7 @@ export default function App() {
       <ChoiceModal />
       {world && <FeedbackPrompt />}
       <ToastView />
-      <ShareFallbackModal />
+      <ShareDialog />
       {!invite && <Coach />}
     </>
   );

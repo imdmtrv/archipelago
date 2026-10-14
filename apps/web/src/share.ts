@@ -1,7 +1,7 @@
 import { getPlayer } from '@arch/engine';
 import { track } from './analytics';
 import { HUMAN, useGame } from './store';
-import { challengeResult, displayPlayer, getI18n } from './i18n';
+import { challengeComparison, challengeResult, displayPlayer, getI18n, weeksAcc } from './i18n';
 import { encodeChallenge, MAX_CHALLENGE_WEEKS, type ChallengeData } from './challenge';
 import { createShareCard } from './shareCard';
 
@@ -18,7 +18,7 @@ export function currentChallenge(): ChallengeData | null {
 }
 
 let sharing = false;
-export async function share(text?: string) {
+export async function share() {
   if (sharing) return;
   sharing = true;
   const { lang, t } = getI18n();
@@ -31,39 +31,23 @@ export async function share(text?: string) {
     if (!base.pathname.endsWith('/')) base.pathname += '/';
     const url = new URL(lang === 'en' ? 'en/' : '', base);
     url.searchParams.set('c', encodeChallenge(data));
-    const message = text ?? challengeResult(data);
-    const blob = await createShareCard(data, useGame.getState().challenge, base.host + base.pathname);
+    const challenge = useGame.getState().challenge;
+    let message = data.freedomWeek === null ? challengeResult(data) : t.ui.challenge.message(weeksAcc(data.freedomWeek), data.island);
+    if (challenge && data.freedomWeek !== null) message += `\n${challengeComparison(data.freedomWeek, challenge, true)}.`;
+    const blob = await createShareCard(data, challenge, base.host + base.pathname);
     const file = new File([blob], 'archipelago-challenge.png', { type: 'image/png' });
-    track('share');
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      try {
+    try {
+      if (matchMedia('(pointer: coarse)').matches && navigator.share && navigator.canShare?.({ files: [file] })) {
+        track('share');
         await navigator.share({ files: [file], title: t.ui.share.title, text: message, url: url.href });
         return;
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        // Неподдерживаемая отправка файлов — обычное скачивание и ссылка.
       }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
+      // При ошибке системного меню все способы отправки доступны в своём окне.
     }
-    const download = document.createElement('a');
-    const objectUrl = URL.createObjectURL(blob);
-    download.href = objectUrl; download.download = file.name;
-    document.body.append(download); download.click(); download.remove();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
-    const content = `${message}\n${url.href}`;
-    try {
-      await navigator.clipboard.writeText(content);
-      useGame.getState().showToast(t.ui.challenge.downloaded, 'good');
-    } catch {
-      // Старые браузеры и HTTP: копирование в рамках нажатия на кнопку.
-      const input = document.createElement('textarea');
-      input.value = content; input.style.position = 'fixed'; input.style.opacity = '0';
-      document.body.append(input); input.select();
-      let copied = false;
-      try { copied = document.execCommand('copy'); } catch { /* покажем ссылку вручную */ }
-      input.remove();
-      if (copied) useGame.getState().showToast(t.ui.challenge.downloaded, 'good');
-      else useGame.setState({ shareFallback: content });
-    }
+    useGame.setState({ shareFallback: { blob, message, url: url.href } });
+    track('share');
   } catch {
     useGame.getState().showToast(t.ui.share.failed, 'bad');
   } finally { sharing = false; }

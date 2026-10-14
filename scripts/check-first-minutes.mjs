@@ -158,6 +158,8 @@ try {
   await shared.addInitScript(() => {
     Object.defineProperty(navigator, 'share', { configurable: true, value: (data) => { window.__shared = data; return Promise.resolve(); } });
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = (query) => query === '(pointer: coarse)' ? { ...original(query), matches: true } : original(query);
   });
   // «Поделиться» сначала рисует картинку, поэтому ждём вызова navigator.share
   const sharedData = async () => {
@@ -176,7 +178,7 @@ try {
   });
   await shared.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
   let data = await sharedData();
-  assert.equal(data.title, 'Архипелаг'); assert.match(data.text, /21 неделю/); assert.match(data.url, /\?c=[\w-]+$/);
+  assert.equal(data.title, 'Архипелаг'); assert.match(data.text, /^Финансовая свобода за 21 неделю в «Архипелаге»/); assert.match(data.text, /на моём острове «/); assert.match(data.url, /\?c=[\w-]+$/);
   assert.deepEqual(data.files, ['image/png']);
   await shared.evaluate(async () => {
     const { useGame } = await import('/src/store.ts'); const state = useGame.getState(); const world = structuredClone(state.world);
@@ -184,24 +186,86 @@ try {
     useGame.setState({ world, modal: { ...state.modal, epilogue:true } });
   });
   await shared.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
-  data = await sharedData(); assert.match(data.text, /21 неделю/); assert.match(data.text, /37 недель/);
+  data = await sharedData(); assert.match(data.text, /^Финансовая свобода за 21 неделю в «Архипелаге»/);
+  // Отмена на телефоне не открывает окно; другая ошибка открывает все способы отправки.
+  await shared.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: () => Promise.reject(new DOMException('Cancelled', 'AbortError')) }));
+  await shared.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
+  await shared.getByRole('button', { name: 'Поделиться результатом', exact: true }).waitFor({ state: 'visible' });
+  await shared.waitForFunction(async () => { const { useGame } = await import('/src/store.ts'); return useGame.getState().shareFallback === null && !document.querySelector('[aria-busy="true"]'); });
+  assert.equal(await shared.locator('.share-dialog').count(), 0);
+  await shared.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: () => Promise.reject(new Error('Unsupported')) }));
+  await shared.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
+  await shared.locator('.share-dialog').waitFor();
+  await shared.keyboard.press('Escape');
+  await shared.locator('.share-dialog').waitFor({ state: 'hidden' });
+  assert.equal(await shared.locator('.epilogue').count(), 1, 'Escape closed the underlying epilogue');
   await shared.close();
 
   const clip = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'], locale: 'ru-RU' });
   const clipPage = await clip.newPage();
-  await clipPage.addInitScript(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }));
+  await clipPage.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: () => { window.__nativeShare = true; return Promise.resolve(); } });
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = (query) => query === '(pointer: coarse)' ? { ...original(query), matches: false } : original(query);
+  });
   await clipPage.goto(url); await clipPage.evaluate(() => localStorage.setItem('archipelago.coach.v1', 'done')); await clipPage.reload();
   if (!await clipPage.locator('.hud').count()) await clipPage.getByRole('button', { name: 'Начать игру', exact: true }).click();
   await clipPage.evaluate(async () => {
     const { useGame } = await import('/src/store.ts'); const world = structuredClone(useGame.getState().world); world.players[0].freedomWeek = 23;
     const mine={playerId:'p1',salary:0,assetIncome:[],upkeep:[],living:80,interest:0,insurance:0,eventsCash:0,net:0,cashAfter:600,happinessDelta:0,events:[],lostAssetUids:[],freedomReached:true};
     world.week = 24; world.lastReport = { week:23, worldEvents:[], players:{p1:mine}, news:[] };
-    useGame.setState({world,modal:{report:{week:23,worldEvents:[],players:{p1:mine},news:[]},events:[],freedom:true,epilogue:false}});
+    const challenge = { v:1, seed:world.seed, profession:'teacher', name:'Дима', island:'Тихая Гавань', week:26, freedomWeek:26, progress:Array(26).fill(100), moments:[] };
+    useGame.setState({world,challenge,modal:{report:{week:23,worldEvents:[],players:{p1:mine},news:[]},events:[],freedom:true,epilogue:false}});
   });
   await clipPage.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
-  // Без системного «Поделиться»: картинка скачивается, текст со ссылкой-вызовом копируется
-  await clipPage.getByText('Картинка скачана, ссылка скопирована — отправьте их другу', { exact: true }).waitFor();
-  assert.match(await clipPage.evaluate(() => navigator.clipboard.readText()), /Архипелаг: финансовая свобода за 23 недели[\s\S]*\?c=[\w-]+$/);
+  // На компьютере системное меню не вызывается даже при поддержке отправки файлов.
+  const dialog = clipPage.getByRole('dialog', { name: 'Бросить вызов другу', exact: true });
+  await dialog.waitFor();
+  assert.equal(await clipPage.evaluate(() => !!window.__nativeShare), false);
+  await dialog.locator('img').evaluate((img) => img.decode());
+  assert.deepEqual(await dialog.locator('img').evaluate((img) => [img.naturalWidth, img.naturalHeight]), [1080, 1350]);
+  const content = await dialog.getByRole('textbox').inputValue();
+  assert.match(content, /^Финансовая свобода за 23 недели в «Архипелаге»/);
+  assert.match(content, /На 3 недели быстрее, чем Дима\./);
+  assert.match(content, /\?c=[\w-]+$/);
+  assert.equal(await dialog.getByRole('textbox').getAttribute('readonly'), '');
+  const challengeUrl = content.split('\n').at(-1);
+  for (const [name, base, urlKey, textKey] of [
+    ['Telegram', 'https://t.me/share/url', 'url', 'text'],
+    ['ВКонтакте', 'https://vk.com/share.php', 'url', 'title'],
+    ['WhatsApp', 'https://wa.me/', null, 'text'],
+  ]) {
+    const href = new URL(await dialog.getByRole('link', { name, exact:true }).getAttribute('href'));
+    assert.equal(href.origin + href.pathname, base);
+    if (urlKey) assert.equal(href.searchParams.get(urlKey), challengeUrl);
+    assert.equal(href.searchParams.get(textKey), urlKey ? content.slice(0, -(challengeUrl.length + 1)) : content);
+  }
+  await dialog.getByRole('button', { name: 'Скопировать ссылку', exact:true }).click();
+  await clipPage.getByRole('status').filter({ hasText:'Текст со ссылкой скопирован' }).waitFor();
+  // Буфер Windows отдаёт переводы строк как \r\n
+  assert.equal((await clipPage.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), content);
+  await dialog.getByRole('button', { name: 'Скопировать картинку', exact:true }).click();
+  await clipPage.getByRole('status').filter({ hasText:'Картинка скопирована — вставьте её в чат (Ctrl+V)' }).waitFor();
+  assert(await clipPage.evaluate(async () => (await navigator.clipboard.read()).some((item) => item.types.includes('image/png'))));
+  const downloading = clipPage.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Скачать картинку', exact:true }).click();
+  assert.equal((await downloading).suggestedFilename(), 'archipelago-challenge.png');
+  await clipPage.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, 'writeText', { configurable:true, value:() => Promise.reject(new Error('Denied')) });
+    Object.defineProperty(navigator.clipboard, 'write', { configurable:true, value:() => Promise.reject(new Error('Denied')) });
+  });
+  for (const name of ['Скопировать ссылку', 'Скопировать картинку']) {
+    await dialog.getByRole('button', { name, exact:true }).click();
+    await clipPage.getByRole('status').filter({ hasText:'Не получилось скопировать — выделите текст в поле и скопируйте вручную' }).waitFor();
+    assert.equal(await dialog.getByRole('textbox').inputValue(), content);
+  }
+  await clipPage.keyboard.press('Escape');
+  await dialog.waitFor({ state:'hidden' });
+  assert.equal(await clipPage.locator('.freedom-modal').count(), 1, 'Escape closed the underlying result');
+  await clipPage.getByRole('button', { name: 'Поделиться результатом', exact: true }).click();
+  await dialog.getByRole('button', { name:'Закрыть', exact:true }).click();
+  await dialog.waitFor({ state:'hidden' });
   await clip.close();
 
   const analytics = await browser.newPage({ locale: 'ru-RU' });
