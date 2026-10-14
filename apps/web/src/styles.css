@@ -628,3 +628,18 @@ button, input { font: inherit; color: inherit; }
 .rumor-chip.gossip { border-color: currentColor; border-style: dashed; font-weight: 700; }
 .rumor-chip.gossip.pos { background: rgba(35, 147, 94, 0.06); }
 .rumor-chip.gossip.neg { background: rgba(220, 75, 67, 0.06); }
+
+/* ───────── Приглашение оставить отзыв ───────── */
+.feedback-prompt {
+  position: fixed; left: 50%; bottom: 112px; transform: translateX(-50%); z-index: 20;
+  width: min(360px, calc(100vw - 32px)); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
+  background: rgba(255, 251, 243, 0.94); animation: card-in .35s cubic-bezier(.2,.9,.3,1.2);
+}
+.feedback-prompt b { font: 700 16px/1.2 var(--font-display); }
+.feedback-prompt p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); font-weight: 600; }
+.feedback-prompt-buttons { display: flex; gap: 8px; }
+.feedback-prompt-buttons .btn { flex: 1; text-align: center; text-decoration: none; }
+@media (max-width: 1023px) {
+  .feedback-prompt { bottom: auto; top: 150px; }
+}
+
