@@ -101,15 +101,14 @@ class AudioEngine {
         this.applySettings();
         this.preloadSelected();
       }
-      this.resume();
+      this.resume(true);
     } catch { this.failed = true; this.stop(); }
   }
 
-  private resume() {
-    if (!this.context || document.hidden || this.resuming) return;
+  private resume(fromGesture = false) {
+    if (!this.context || document.hidden || (this.resuming && !fromGesture)) return;
     try {
       const ready = () => {
-        this.resuming = undefined;
         try {
           if (document.hidden) {
             void this.context?.suspend().catch(() => {});
@@ -120,8 +119,14 @@ class AudioEngine {
           this.reconcile();
         } catch { /* Visibility can interrupt browser audio operations. */ }
       };
-      if (this.context.state === 'running') { ready(); return; }
-      this.resuming = this.context.resume().then(ready, () => { this.resuming = undefined; });
+      if (this.context.state === 'running') { this.resuming = undefined; ready(); return; }
+      // Новый жест повторяет попытку, даже если браузер удерживает прежний промис.
+      const pending = this.context.resume().then(() => {
+        if (this.resuming !== pending) return;
+        this.resuming = undefined;
+        ready();
+      }, () => { if (this.resuming === pending) this.resuming = undefined; });
+      this.resuming = pending;
     } catch { /* Unsupported or interrupted audio must never affect play. */ }
   }
 

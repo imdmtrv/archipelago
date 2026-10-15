@@ -841,6 +841,9 @@ export const en: Dict = {
     },
     goals: {
       title: 'Goals',
+      show: 'Show goals',
+      hide: 'Hide goals',
+      newDone: (n) => `+${n}`,
       progress: (value, target) => `${value} / ${target}`,
       reward: (parts) => `Reward: ${parts}`,
       joy: (n) => `+${n} happiness`,

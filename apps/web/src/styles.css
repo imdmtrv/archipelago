@@ -422,6 +422,18 @@ button, input { font: inherit; color: inherit; }
 .hud.mobile .emblem { width: 36px; height: 36px; }
 @media (max-width: 1023px) {
   .toast { top: auto; bottom: calc(26vh + 24px); }
+  body:has(.modal-backdrop, .neighbor-card, .feedback-prompt, .audio-panel) .coach { display: none; }
+  .sheet-header { position: relative; display: flex; flex-direction: column; flex: none; touch-action: none; user-select: none; }
+  .sheet.open .sheet-freedom { position: absolute; left: 0; right: 0; visibility: hidden; pointer-events: none; }
+  .sheet.dragging { transition: none; }
+  .mobile-goals { display: flex; flex-direction: column; gap: 12px; }
+  .goals-summary { display: flex; flex: none; align-items: center; gap: 8px; width: 100%; height: 48px; padding: 0 10px; border: 0; border-radius: 16px; background: var(--paper-solid); box-shadow: 0 1px 0 rgba(31,42,68,.06); cursor: pointer; white-space: nowrap; }
+  .goals-summary > b { font: 700 13px var(--font-display); }
+  .goals-count { font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+  .goals-rings { display: flex; gap: 3px; }
+  .goal-ring { display: flex; width: 18px; height: 18px; flex: none; }
+  .goals-new { border-radius: 99px; padding: 2px 5px; background: var(--asset); color: #fff; font-size: 10px; font-weight: 800; }
+  .goals-chevron { margin-left: auto; }
 }
 
 .sheet {
@@ -549,6 +561,13 @@ button, input { font: inherit; color: inherit; }
 .hud.mobile .title, .hud.mobile .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .neighbor-modal > div { width: min(420px, 100%); }
 .neighbor-modal .neighbor-card { position: relative; transform: none; width: 100%; max-height: calc(100vh - 32px); background: rgba(255, 251, 243, 0.94); }
+@media (max-width: 1023px) {
+  .neighbor-modal { padding: 12px; }
+  .neighbor-modal > div { min-width: 0; }
+  .neighbor-modal .neighbor-card { top: auto; left: auto; max-height: calc(100dvh - 24px); overscroll-behavior: contain; }
+  .neighbor-dropdown { position: fixed; left: 12px; right: 12px; top: 12px; width: auto; max-height: calc(100dvh - 24px); }
+  .neighbor-dropdown .neighbor-card { top: auto; left: auto; min-height: 0; max-height: calc(100dvh - 24px); }
+}
 
 /* ───────── Улучшения и места на острове ───────── */
 .slots { display: flex; flex-wrap: wrap; gap: 5px; }

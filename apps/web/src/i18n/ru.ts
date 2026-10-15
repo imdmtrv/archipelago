@@ -841,6 +841,9 @@ export const ru = {
     },
     goals: {
       title: 'Цели',
+      show: 'Показать цели',
+      hide: 'Скрыть цели',
+      newDone: (n: number) => `+${n}`,
       progress: (value: string, target: string) => `${value} из ${target}`,
       reward: (parts: string) => `Награда: ${parts}`,
       joy: (n: number) => `+${n} к счастью`,

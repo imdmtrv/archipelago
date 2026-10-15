@@ -4,6 +4,10 @@ import { useI18n } from '../i18n';
 
 interface Placement { step: number; targetUid: string | null; target: DOMRect; bubbleTop: number; bubbleLeft: number; above: boolean; measured: boolean }
 
+// Окна со своим состоянием (например, отзыв) тоже скрывают обучение.
+const blocked = () => window.matchMedia('(max-width: 1023px)').matches
+  && !!document.querySelector('.modal-backdrop, .neighbor-card, .feedback-prompt, .audio-panel');
+
 export function Coach() {
   const { t } = useI18n();
   const step = useCoach((s) => s.step);
@@ -18,6 +22,11 @@ export function Coach() {
     if (!step) return;
     let frame = 0;
     const update = () => {
+      if (blocked()) {
+        setPlacement(null);
+        frame = requestAnimationFrame(update);
+        return;
+      }
       const selector = step === 1 && targetUid
         ? `[data-offer-uid="${targetUid}"] .btn.primary`
         : step === 2 ? '[data-coach="next-week"]:not([hidden])' : '[data-coach="freedom"]';
@@ -53,7 +62,7 @@ export function Coach() {
 
   useEffect(() => {
     if (!step) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') skip(); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !blocked()) skip(); };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
   }, [step, skip]);
