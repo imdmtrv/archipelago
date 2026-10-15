@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { audio } from './engine';
 import { CUES, type CueId } from './cues';
 
-/** One listener covers mouse, touch and keyboard buttons without changing their handlers. */
+/** Общие слушатели для мыши, касаний и клавиатуры. */
 export function useUiSound() {
   useEffect(() => {
     const unlock = (event: Event) => { if (event.isTrusted) audio.unlock(); };
@@ -20,13 +20,12 @@ export function useUiSound() {
       if (event.isTrusted && event.target instanceof HTMLInputElement && event.target.type === 'checkbox'
         && event.target.dataset.uiSound !== 'none') audio.play('ui.toggle');
     };
-    document.addEventListener('pointerdown', unlock, true);
-    document.addEventListener('keydown', unlock, true);
+    const gestures = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
+    gestures.forEach((type) => document.addEventListener(type, unlock, true));
     document.addEventListener('click', click, true);
     document.addEventListener('change', change, true);
     return () => {
-      document.removeEventListener('pointerdown', unlock, true);
-      document.removeEventListener('keydown', unlock, true);
+      gestures.forEach((type) => document.removeEventListener(type, unlock, true));
       document.removeEventListener('click', click, true);
       document.removeEventListener('change', change, true);
     };
