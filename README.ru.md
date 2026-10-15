@@ -24,7 +24,7 @@
 
 Бесплатно, без регистрации и рекламы. Работает на телефоне и компьютере, по-русски и по-английски.
 
-https://github.com/user-attachments/assets/85591764-637f-4777-ba73-c42e42775d80
+https://github.com/user-attachments/assets/f0b2a3d2-9f09-441b-b882-903b65c6164c
 
 <p align="center"><sub>Ролик на 45 секунд · вертикальные версии на 30 секунд и файлы в полном качестве — в <a href="https://github.com/imdmtrv/archipelago/releases/tag/v1.0.0">релизе v1.0</a></sub></p>
 
