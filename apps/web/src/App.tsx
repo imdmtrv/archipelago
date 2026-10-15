@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { IslandScene } from './scene/IslandScene';
+import { SceneGuard } from './scene/SceneGuard';
 import { dreamProgress, placedItems, useGame } from './store';
 import { TopBar } from './ui/TopBar';
 import { DesktopLayout, MobileLayout, useMediaQuery } from './ui/Panels';
@@ -64,7 +64,7 @@ export default function App() {
 
   return (
     <>
-      <IslandScene
+      <SceneGuard
         items={items}
         dream={dream}
         floats={floats}
