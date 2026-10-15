@@ -1,0 +1,28 @@
+name: Bug report / Ошибка
+description: Something doesn't work or looks broken / Что-то не работает или выглядит сломанным
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / Что случилось?
+      description: What you did, what you expected, what you saw instead. / Что делали, чего ждали, что увидели.
+    validations:
+      required: true
+  - type: input
+    id: week
+    attributes:
+      label: Week and language / Неделя и язык
+      placeholder: "Week 12, EN / Неделя 12, RU"
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser / Устройство и браузер
+      placeholder: "iPhone 13, Safari / Windows, Chrome / Telegram"
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot / Скриншот
+      description: Drag an image here if you have one. / Перетащите картинку, если есть.
