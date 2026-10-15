@@ -3,7 +3,7 @@ import { DREAM_WORK_EMPLOYED, getPlayer, PROFESSIONS, PROFESSION_ORDER, type Pro
 import { HUMAN, useGame, type WeekModal as WeekModalData } from '../store';
 import { fmt, signed, weeksAcc } from '../format';
 import { challengeComparison, challengeResult, dictFor, dreamCopy, eventCopy, useI18n, type Lang } from '../i18n';
-import { Confetti } from './common';
+import { Confetti, focusOnMount } from './common';
 import { EpilogueModal } from './Epilogue';
 import { daysText, lowerFirst, speedUpText } from './text';
 import { Emblem } from './TopBar';
@@ -101,7 +101,7 @@ function FreedomChoice({ onStay, onQuit }: { onStay: () => void; onQuit: () => v
         <div className="choice-card">
           <h3>{t.ui.weekModal.stayTitle}</h3>
           <p>{t.ui.weekModal.stayText(daysText(DREAM_WORK_EMPLOYED))}</p>
-          <button className="btn primary" onClick={onStay} autoFocus>{t.ui.weekModal.stay}</button>
+          <button className="btn primary" onClick={onStay} ref={focusOnMount}>{t.ui.weekModal.stay}</button>
         </div>
         <div className="choice-card">
           <h3>{t.ui.weekModal.quitTitle}</h3>
@@ -193,7 +193,7 @@ export function WeekModal() {
         <WeekSummary modal={modal} />
         {modal.freedom
           ? <FreedomChoice onStay={close} onQuit={quit} />
-          : <button className="btn primary big" onClick={close} autoFocus>{t.ui.weekModal.next}</button>}
+          : <button className="btn primary big" onClick={close} ref={focusOnMount}>{t.ui.weekModal.next}</button>}
       </div>
     </div>
   );
