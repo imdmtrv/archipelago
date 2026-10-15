@@ -24,6 +24,10 @@ financial freedom: you no longer need the job.
 
 Free, no sign-up, no ads. Works on phones and desktops, in English and Russian.
 
+https://github.com/user-attachments/assets/cb35e532-996d-4f73-9617-27b0fae4dd8b
+
+<p align="center"><sub>45-second trailer · vertical 30-second cuts and full-quality files are in <a href="https://github.com/imdmtrv/archipelago/releases/tag/v1.0.0">release v1.0</a></sub></p>
+
 ## Why it exists
 
 The game turns a simple idea into something you live through on your own island: **it isn't the size of your

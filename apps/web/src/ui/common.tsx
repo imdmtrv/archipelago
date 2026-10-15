@@ -87,3 +87,6 @@ export function Confetti() {
     </>
   );
 }
+
+/** Фокус без прокрутки: кнопка внизу высокого окна не уводит заголовок за край экрана (вместо autoFocus). */
+export const focusOnMount = (el: HTMLElement | null) => el?.focus({ preventScroll: true });

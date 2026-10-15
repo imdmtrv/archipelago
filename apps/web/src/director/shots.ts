@@ -37,7 +37,7 @@ export const SHOTS: Record<ShotId, ShotSpec> = {
     id: 'hook',
     kind: 'scene',
     camera: pose([0, -1.2, 0], 30, 24, 68, 64, 60),
-    caption: { ru: '600 монет и маленький остров', en: '600 coins and a tiny island' },
+    caption: { ru: 'Маленький остров и работа', en: 'A tiny island and a job' },
   },
   asset: {
     id: 'asset',

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { financeView, getPlayer, leaderboard } from '@arch/engine';
 import { HUMAN, useGame, type WeekModal } from '../store';
-import { Confetti, ConfirmButton, Meter } from './common';
+import { Confetti, ConfirmButton, focusOnMount, Meter } from './common';
 import { levelTitle, percent } from './text';
 import { displayPlayer, getI18n, useI18n } from '../i18n';
 import { ShareButton } from './ShareButton';
@@ -87,7 +87,7 @@ export function EpilogueModal({ modal }: { modal: WeekModal }) {
         </p>
 
         <div className="epilogue-actions">
-          <button className="btn primary big" onClick={close} autoFocus>{t.ui.epilogue.continue}</button>
+          <button className="btn primary big" onClick={close} ref={focusOnMount}>{t.ui.epilogue.continue}</button>
           <ConfirmButton className="btn ghost big" confirmText={t.ui.epilogue.resetConfirm} onConfirm={resetGame}>
             {t.ui.epilogue.newGame}
           </ConfirmButton>
