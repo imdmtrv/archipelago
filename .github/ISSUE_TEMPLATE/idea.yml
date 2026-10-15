@@ -1,0 +1,11 @@
+name: Idea / Идея
+description: Suggest a mechanic, a lesson about money or an improvement / Предложить механику, урок о деньгах или улучшение
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea / Идея
+      description: What should change and what would the player learn or feel? / Что изменить и что игрок поймёт или почувствует?
+    validations:
+      required: true
