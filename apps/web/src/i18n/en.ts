@@ -417,6 +417,7 @@ export const en: Dict = {
     },
   },
   ui: {
+    stillIslandNote: "3D isn't available in this browser, so the island is shown as a picture. The game works as usual.",
     perWeek: '/wk',
     inWeek: 'a week',
     week: 'Week',
