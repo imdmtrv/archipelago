@@ -104,5 +104,7 @@ sound settings). Fonts: Manrope and Unbounded (SIL Open Font License).
 
 ## License
 
-No license has been chosen yet, so the code is all rights reserved for now. Third-party assets keep their own
-licenses listed in [CREDITS.md](CREDITS.md).
+[PolyForm Noncommercial 1.0.0](LICENSE.md). Read, learn from, change and share the code for any noncommercial
+purpose: personal projects, study, schools and other noncommercial organizations. Commercial use is reserved to the
+author. The name "Archipelago" and the logo are not licensed for branding other products. Sounds and music are
+third-party works under their own licenses — see [CREDITS.md](CREDITS.md).
