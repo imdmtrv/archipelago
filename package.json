@@ -12,6 +12,7 @@
     "build": "npm run build -w @arch/web",
     "test": "npm run test -w @arch/engine",
     "sim": "npm run sim -w @arch/engine",
+    "sim:arch": "npm run sim:arch -w @arch/engine",
     "typecheck": "npm run typecheck -w @arch/engine && npm run typecheck -w @arch/web",
     "trailer": "node scripts/trailer/render.mjs",
     "trailer:fixtures": "tsx scripts/trailer/fixtures.ts",

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Макет: экран архипелага</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Unbounded:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1F2A44; --ink-soft: #5B6680; --paper: rgba(255, 251, 243, 0.9); --paper-solid: #FFFBF3;
+    --well: rgba(31, 42, 68, 0.05); --line: rgba(31, 42, 68, 0.09); --gold: #F5B83D; --gold-deep: #D9931C;
+    --asset: #23935E; --liability: #DC4B43; --teal: #3E9A9A; --radius: 18px;
+    --shadow: 0 10px 30px rgba(31, 42, 68, 0.16), 0 2px 6px rgba(31, 42, 68, 0.08);
+    --font-display: 'Unbounded', system-ui, sans-serif; --font-body: 'Manrope', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px; background: #EEF1EC; color: var(--ink); font-family: var(--font-body); }
+  h1 { font-family: var(--font-display); font-size: 22px; margin: 0 0 6px; }
+  .lead { color: var(--ink-soft); margin: 0 0 24px; font-size: 14px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .caption { font-size: 13px; color: var(--ink-soft); margin: 10px 4px 0; max-width: 390px; }
+
+  /* Рамки */
+  .desk { position: relative; width: 1280px; height: 760px; border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); }
+  .phone { position: relative; width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 10px solid #1F2A44; box-shadow: var(--shadow); }
+  .sea { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 35%, #7FD3C9 0%, #3FA7A6 45%, #1F7480 100%); }
+  .sea svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .card { background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+  .label { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+  .num { font-family: var(--font-display); font-weight: 700; }
+  .pos { color: var(--asset); } .neg { color: var(--liability); }
+
+  /* Верхняя панель */
+  .brand { position: absolute; display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+  .logo { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(160deg, #4CC3C0, #2A7F96); display: grid; place-items: center; color: #fff; font-size: 20px; }
+  .brand b { font-family: var(--font-display); font-size: 18px; display: block; }
+  .brand span { font-size: 13px; color: var(--ink-soft); }
+  .neighbors { position: absolute; display: flex; gap: 14px; padding: 10px 16px; align-items: center; }
+  .nb { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+  .nb i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-style: normal; font-size: 12px; border: 3px solid var(--gold); }
+  .nb small { display: block; color: var(--ink-soft); font-weight: 600; font-size: 11px; }
+  .stats { position: absolute; display: flex; gap: 10px; }
+  .stat { padding: 10px 14px; min-width: 110px; }
+  .stat .num { font-size: 22px; display: block; margin-top: 2px; }
+  .stat small { font-size: 12px; color: var(--ink-soft); font-weight: 700; }
+
+  /* Переключатель режима */
+  .mode { position: absolute; display: flex; padding: 4px; border-radius: 999px; background: var(--paper-solid); box-shadow: var(--shadow); font-weight: 800; font-size: 14px; }
+  .mode span { padding: 8px 16px; border-radius: 999px; color: var(--ink-soft); }
+  .mode .on { background: var(--ink); color: #fff; }
+  .mode .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--liability); margin-left: 6px; vertical-align: 2px; }
+
+  /* Метки над островами */
+  .pin { position: absolute; transform: translate(-50%, -100%); padding: 6px 10px 6px 8px; border-radius: 12px; font-size: 12px; font-weight: 800; white-space: nowrap; box-shadow: 0 6px 16px rgba(31,42,68,.22); display: flex; gap: 6px; align-items: center; }
+  .pin::after { content: ''; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: inherit; border-bottom: 0; }
+  .pin small { display: block; font-weight: 600; font-size: 11px; opacity: .8; }
+  .pin.free { background: var(--paper-solid); color: var(--ink); border-color: var(--paper-solid); }
+  .pin.mine { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+  .pin.nbr { background: var(--teal); color: #fff; border-color: var(--teal); }
+  .pin.dim { background: rgba(255,251,243,.7); color: var(--ink-soft); border-color: rgba(255,251,243,.7); }
+  .pin .ic { font-size: 16px; }
+
+  /* Панель архипелага */
+  .panel { position: absolute; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+  .ptitle { display: flex; justify-content: space-between; align-items: baseline; }
+  .ptitle b { font-family: var(--font-display); font-size: 18px; }
+  .strip { font-size: 13px; color: var(--ink-soft); font-weight: 600; }
+  .strip b { color: var(--ink); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 12px; font-weight: 800; padding: 5px 10px; border-radius: 999px; background: var(--well); color: var(--ink-soft); }
+  .chip.gold { background: rgba(245,184,61,.22); color: #8A5A08; }
+  .chip.green { background: rgba(35,147,94,.12); color: var(--asset); }
+  .chip.teal { background: rgba(62,154,154,.14); color: #23706F; }
+  .isle { background: var(--paper-solid); border-radius: 14px; padding: 9px 14px; border: 1px solid var(--line); }
+  .isle.open { padding: 12px 14px; box-shadow: 0 6px 18px rgba(31,42,68,.10); border-color: rgba(245,184,61,.6); }
+  .ihead { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; }
+  .ihead small { font-weight: 600; color: var(--ink-soft); }
+  .ihead .state { font-size: 12px; font-weight: 800; }
+  .isle h3 { font-family: var(--font-display); font-size: 17px; margin: 6px 0 2px; }
+  .isle p { margin: 0 0 8px; font-size: 13px; color: var(--ink-soft); line-height: 1.4; }
+  .cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+  .cell { background: var(--well); border-radius: 12px; padding: 8px 10px; }
+  .cell .num { font-size: 17px; display: block; margin-top: 2px; }
+  .cell small { font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+  .effect { font-size: 13px; font-weight: 700; color: #23706F; margin-bottom: 4px; }
+  .result { font-size: 13px; font-weight: 800; color: var(--asset); margin-bottom: 8px; }
+  .btn { display: block; width: 100%; text-align: center; padding: 11px; border-radius: 14px; font-weight: 800; font-size: 14px; background: var(--gold); box-shadow: inset 0 -3px 0 rgba(0,0,0,.15); }
+  .btn.ghost { background: var(--well); color: var(--ink-soft); box-shadow: none; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--well); border-radius: 12px; padding: 4px; font-size: 12px; font-weight: 800; text-align: center; }
+  .seg span { padding: 7px 4px; border-radius: 9px; color: var(--ink-soft); }
+  .seg .on { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(31,42,68,.12); }
+  .next { position: absolute; padding: 14px 40px; border-radius: 18px; background: var(--gold); box-shadow: var(--shadow), inset 0 -4px 0 rgba(0,0,0,.15); text-align: center; }
+  .next b { font-family: var(--font-display); font-size: 20px; display: block; }
+  .next small { font-size: 12px; font-weight: 700; }
+  .left { position: absolute; padding: 16px 18px; }
+  .bar { height: 12px; border-radius: 999px; background: var(--well); overflow: hidden; margin: 10px 0 8px; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-deep)); }
+
+  /* Окно развилки */
+  .shade { position: absolute; inset: 0; background: rgba(31,42,68,.45); }
+  .modal { position: absolute; left: 14px; right: 14px; top: 150px; padding: 20px 18px; background: var(--paper-solid); border-radius: 24px; box-shadow: var(--shadow); }
+  .modal h2 { font-family: var(--font-display); font-size: 24px; margin: 6px 0 10px; }
+  .modal p { font-size: 15px; color: var(--ink-soft); line-height: 1.45; margin: 0 0 14px; }
+  .modal .btn { margin-top: 8px; padding: 14px; font-size: 15px; }
+</style>
+</head>
+<body>
+<h1>Экран архипелага — макет</h1>
+<p class="lead">Режим «Архипелаг»: камера поднялась, видны все шесть островов, справа — острова архипелага. Неделя 74, свобода 168%: у игрока склад и верфь (2 из 3 дел), Мия построила отель сама, Пеликан свободен — третье дело рыбной связки.</p>
+
+<div class="row">
+  <!-- ═════════ Компьютер ═════════ -->
+  <div>
+    <div class="desk">
+      <div class="sea">
+        <svg viewBox="0 0 1280 760" preserveAspectRatio="none">
+          <defs>
+            <g id="isle">
+              <ellipse cx="0" cy=".08" rx="1" ry=".62" fill="#E9D7A6"/>
+              <ellipse cx="0" cy="0" rx=".82" ry=".5" fill="#6DB45C"/>
+              <circle cx="-.35" cy="-.12" r=".14" fill="#3F8E46"/><circle cx=".3" cy="-.18" r=".12" fill="#3F8E46"/><circle cx=".05" cy=".15" r=".1" fill="#4F9D4B"/>
+            </g>
+          </defs>
+          <g fill="none" stroke="#FFFBF3" stroke-width="3" stroke-dasharray="10 10" opacity=".85">
+            <path d="M600 420 Q530 360 470 300"/><path d="M640 410 Q710 350 770 300"/>
+            <path d="M590 470 Q520 540 480 600"/><path d="M650 470 Q720 540 775 595"/>
+          </g>
+          <!-- родной остров -->
+          <g transform="translate(615 440) scale(115 115)"><use href="#isle" transform="translate(0 -.07)"/></g>
+          <rect x="598" y="392" width="34" height="26" rx="4" fill="#F2EEE4"/><path d="M594 394 L615 378 L636 394Z" fill="#2E8C86"/>
+          <!-- острова горизонта -->
+          <g transform="translate(470 300) scale(62 62)"><use href="#isle"/></g>
+          <g transform="translate(770 300) scale(66 66)"><use href="#isle"/></g>
+          <g transform="translate(480 610) scale(60 60)"><use href="#isle"/></g>
+          <g transform="translate(775 605) scale(64 64)"><use href="#isle"/></g>
+          <g transform="translate(620 245) scale(58 58)" opacity=".55"><use href="#isle"/></g>
+          <!-- лодочка на линии -->
+          <g transform="translate(700 352)"><path d="M-12 0 L12 0 L7 7 L-7 7Z" fill="#E8574B"/><path d="M0 0 L0 -16 L9 -2Z" fill="#FFFBF3"/></g>
+        </svg>
+      </div>
+
+      <div class="card brand" style="left:20px; top:20px;"><div class="logo">≋</div><div><b>Лагуна</b><span>Неделя 74</span></div></div>
+      <div class="card neighbors" style="left:430px; top:24px;">
+        <div class="nb"><i style="background:#6B5BD6">Б</i><div>Борис<small>210%</small></div></div>
+        <div class="nb"><i style="background:#2E8C86">В</i><div>Вы<small>168%</small></div></div>
+        <div class="nb"><i style="background:#E5674D">М</i><div>Мия<small>240%</small></div></div>
+        <div class="nb"><i style="background:#F09A2D">Т</i><div>Тимур<small>64%</small></div></div>
+      </div>
+      <div class="stats" style="right:20px; top:20px;">
+        <div class="card stat"><div class="label">Наличные</div><span class="num">6 240</span></div>
+        <div class="card stat"><div class="label">Пассивный доход</div><span class="num pos">+1 120 <small>/нед</small></span></div>
+        <div class="card stat"><div class="label">Расходы</div><span class="num neg">−666 <small>/нед</small></span></div>
+      </div>
+
+      <div class="mode" style="left:50%; top:100px; transform:translateX(-50%);"><span>🏝 Мой остров</span><span class="on">🗺 Архипелаг<i class="dot"></i></span></div>
+
+      <div class="card left" style="left:20px; top:100px; width:330px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;"><b>Уверенность</b><span class="num" style="font-size:26px">168%</span></div>
+        <div class="bar"><i style="width:56%"></i></div>
+        <div style="font-size:13px; color:var(--ink-soft)">До «Богатства» (200%) — 32%. Архипелаг даёт +420 из 1 120 в неделю.</div>
+      </div>
+
+      <div class="pin free" style="left:770px; top:252px;"><span class="ic">🏭</span><div>Пеликан<small>завод · свободно</small></div></div>
+      <div class="pin mine" style="left:470px; top:254px;"><span class="ic">❄️</span><div>Маяк<small>ваш склад</small></div></div>
+      <div class="pin nbr" style="left:480px; top:566px;"><span class="ic">🏨</span><div>Ракушка<small>отель Мии</small></div></div>
+      <div class="pin mine" style="left:775px; top:560px;"><span class="ic">⚓</span><div>Кедровый<small>ваша верфь</small></div></div>
+      <div class="pin dim" style="left:620px; top:212px;"><span class="ic">🏦</span><div>Большой<small>нет парома</small></div></div>
+
+      <div class="card panel" style="right:20px; top:100px; width:420px; height:640px; gap:6px; padding:14px 16px;">
+        <div class="ptitle"><b>Архипелаг</b><span class="label">Неделя 74</span></div>
+        <div class="strip">Дела <b>2 из 3</b> · Дни <b>1 из 1</b> · Архипелаг <b class="pos">+420</b>/нед</div>
+        <div class="chips"><span class="chip gold">Рыбная связка 2/3</span><span class="chip">Курорт 1/3</span></div>
+
+        <div class="isle"><div class="ihead"><span>❄️ Маяк <small>· Тимур</small></span><span class="state" style="color:var(--gold-deep)">ваш склад · +38/нед</span></div></div>
+
+        <div class="isle open">
+          <div class="ihead"><span>🏭 Пеликан <small>· Борис · паром есть</small></span></div>
+          <div class="chips" style="margin-top:8px"><span class="chip green">Дело · рыба</span><span class="chip gold">Рыбная связка: третье дело</span></div>
+          <h3>Консервный завод</h3>
+          <p>Скупает улов у лодок архипелага и делает из него консервы.</p>
+          <div class="cells">
+            <div class="cell"><small>ЦЕНА</small><span class="num">8 000</span></div>
+            <div class="cell"><small>ДОХОД</small><span class="num pos">+310</span><small>/нед</small></div>
+            <div class="cell"><small>ОКУПИТСЯ</small><span class="num">26</span><small> нед</small></div>
+          </div>
+          <div class="effect">Улов всех, кто в сети, дороже на 20%. Соберёте связку — каждое из трёх дел +25%.</div>
+          <div class="result">Свобода: 168% → 205%</div>
+          <div class="btn">Построить: 4 000 своих + 4 000 в кредит</div>
+        </div>
+
+        <div class="isle"><div class="ihead"><span>🏨 Ракушка <small>· Мия</small></span><span class="state" style="color:#23706F">отель Мии</span></div></div>
+        <div class="isle"><div class="ihead"><span>⚓ Кедровый</span><span class="state" style="color:var(--gold-deep)">ваша верфь · +182/нед</span></div></div>
+        <div class="isle"><div class="ihead"><span>🏦 Большой</span><span class="state">паром — 420</span></div></div>
+      </div>
+
+      <div class="next" style="left:50%; bottom:22px; transform:translateX(-50%);"><b>Следующая неделя →</b><small>≈ +454 к наличным</small></div>
+    </div>
+    <p class="caption">Компьютер, 1280×760. Переключатель режима — над сценой; в панели раскрыт остров, где есть решение, остальные — строками.</p>
+  </div>
+
+  <!-- ═════════ Телефон: шторка ═════════ -->
+  <div>
+    <div class="phone">
+      <div class="sea">
+        <svg viewBox="0 0 390 844" preserveAspectRatio="none">
+          <defs>
+            <g id="isle2">
+              <ellipse cx="0" cy=".08" rx="1" ry=".62" fill="#E9D7A6"/>
+              <ellipse cx="0" cy="0" rx=".82" ry=".5" fill="#6DB45C"/>
+              <circle cx="-.35" cy="-.12" r=".14" fill="#3F8E46"/><circle cx=".3" cy="-.18" r=".12" fill="#3F8E46"/>
+            </g>
+          </defs>
+          <g fill="none" stroke="#FFFBF3" stroke-width="2" stroke-dasharray="7 7" opacity=".85">
+            <path d="M185 270 Q150 240 110 215"/><path d="M205 270 Q240 240 282 215"/>
+            <path d="M180 295 Q140 315 105 330"/><path d="M210 295 Q250 315 285 330"/>
+          </g>
+          <g transform="translate(195 280) scale(52 52)"><use href="#isle2"/></g>
+          <g transform="translate(110 212) scale(30 30)"><use href="#isle2"/></g>
+          <g transform="translate(282 212) scale(32 32)"><use href="#isle2"/></g>
+          <g transform="translate(105 332) scale(29 29)"><use href="#isle2"/></g>
+          <g transform="translate(287 332) scale(31 31)"><use href="#isle2"/></g>
+          <g transform="translate(196 175) scale(28 28)" opacity=".55"><use href="#isle2"/></g>
+        </svg>
+      </div>
+      <div class="card brand" style="left:10px; right:10px; top:14px; padding:8px 12px;"><div class="logo" style="width:34px;height:34px">≋</div><div><b style="font-size:15px">Лагуна</b><span>Неделя 74</span></div></div>
+      <div class="stats" style="left:10px; right:10px; top:76px; gap:6px;">
+        <div class="card stat" style="min-width:0; flex:1; padding:7px 9px"><div class="label" style="font-size:9px">Наличные</div><span class="num" style="font-size:16px">6 240</span></div>
+        <div class="card stat" style="min-width:0; flex:1; padding:7px 9px"><div class="label" style="font-size:9px">Доход</div><span class="num pos" style="font-size:16px">+1 120</span></div>
+        <div class="card stat" style="min-width:0; flex:1; padding:7px 9px"><div class="label" style="font-size:9px">Расходы</div><span class="num neg" style="font-size:16px">−666</span></div>
+        <div class="card stat" style="min-width:0; flex:1; padding:7px 9px"><div class="label" style="font-size:9px">Счастье</div><span class="num" style="font-size:16px">72</span></div>
+      </div>
+      <div class="pin free" style="left:282px; top:192px; font-size:11px; padding:4px 7px"><span class="ic" style="font-size:13px">🏭</span>свободно</div>
+      <div class="pin mine" style="left:110px; top:194px; font-size:11px; padding:4px 7px"><span class="ic" style="font-size:13px">❄️</span>ваш</div>
+      <div class="pin nbr" style="left:105px; top:312px; font-size:11px; padding:4px 7px"><span class="ic" style="font-size:13px">🏨</span>Мия</div>
+      <div class="pin mine" style="left:287px; top:312px; font-size:11px; padding:4px 7px"><span class="ic" style="font-size:13px">⚓</span>ваша</div>
+      <div class="pin dim" style="left:196px; top:157px; font-size:11px; padding:4px 7px"><span class="ic" style="font-size:13px">🏦</span>нет парома</div>
+      <div class="mode" style="right:12px; top:352px; font-size:12px;"><span class="on" style="padding:7px 12px">🏝 Мой остров</span></div>
+
+      <div class="card panel" style="left:0; right:0; bottom:0; height:446px; border-radius:24px 24px 0 0; padding:10px 14px 72px; gap:8px;">
+        <div style="width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 2px"></div>
+        <div class="strip">Дела <b>2 из 3</b> · Дни <b>1 из 1</b> · <b class="pos">+420</b>/нед</div>
+        <div class="chips"><span class="chip gold">Связка 2/3</span><span class="chip">Курорт 1/3</span></div>
+        <div class="isle open" style="padding:12px 14px">
+          <div class="ihead"><span>🏭 Пеликан <small>· Борис</small></span><span class="chip gold" style="font-size:11px">3-е дело связки</span></div>
+          <h3 style="font-size:16px; margin:6px 0 8px">Консервный завод</h3>
+          <div class="cells" style="gap:6px; margin-bottom:8px">
+            <div class="cell" style="padding:7px 8px"><small>ЦЕНА</small><span class="num" style="font-size:15px">8 000</span></div>
+            <div class="cell" style="padding:7px 8px"><small>ДОХОД</small><span class="num pos" style="font-size:15px">+310</span></div>
+            <div class="cell" style="padding:7px 8px"><small>ОКУПИТСЯ</small><span class="num" style="font-size:15px">26 нед</span></div>
+          </div>
+          <div class="effect" style="font-size:12px">Улов сети +20%; со связкой каждое дело +25%.</div>
+          <div class="result" style="margin-bottom:8px">Свобода: 168% → 205%</div>
+          <div class="btn" style="padding:10px; font-size:13px">4 000 своих + 4 000 в кредит</div>
+        </div>
+        <div class="isle" style="padding:9px 12px"><div class="ihead"><span>⚓ Кедровый</span><span class="state" style="color:var(--gold-deep)">ваша · +182</span></div></div>
+        <div class="next" style="left:14px; right:14px; bottom:12px; padding:10px;"><b style="font-size:17px">Следующая неделя →</b></div>
+      </div>
+    </div>
+    <p class="caption">Телефон, 390×844. Переключатель — над шторкой. Раскрыта одна карточка, остальные строками — шторку можно потянуть выше.</p>
+  </div>
+
+  <!-- ═════════ Телефон: развилка ═════════ -->
+  <div>
+    <div class="phone">
+      <div class="sea"></div>
+      <div class="shade"></div>
+      <div class="modal">
+        <div class="label">Развилка · ответить можно 4 недели</div>
+        <h2>Борис зовёт в долю</h2>
+        <p>Борис собрал на консервный завод и предлагает строить вместе: вы платите половину, доход пополам, управляет Борис. Это третье дело вашей рыбной связки — с ним каждое из трёх приносит на 25% больше.</p>
+        <div class="cells" style="grid-template-columns:1fr 1fr">
+          <div class="cell"><small>ВАША ПОЛОВИНА</small><span class="num">4 000</span></div>
+          <div class="cell"><small>ВАШ ДОХОД</small><span class="num pos">+155</span><small>/нед</small></div>
+        </div>
+        <div style="font-size:13px; font-weight:700; color:var(--ink-soft)">Место: третье из трёх</div>
+        <div class="btn">Войти в долю за 4 000</div>
+        <div class="btn ghost" style="color:var(--ink)">Подумаю (ещё 3 недели)</div>
+        <div class="btn ghost">Пусть строит сам</div>
+      </div>
+    </div>
+    <p class="caption">Развилка партнёрства: три ответа, предложение ждёт 4 недели — без давления.</p>
+  </div>
+</div>
+</body>
+</html>

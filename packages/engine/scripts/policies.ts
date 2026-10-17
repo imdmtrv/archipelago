@@ -125,7 +125,7 @@ export const HUMAN_POLICIES: Record<string, Policy> = {
 /** Запас, который игрок оставляет после оплаты этапа мечты. */
 const DREAM_RESERVE = 150;
 /** Следующий этап мечты — как только его можно начать и после оплаты остаётся запас. */
-const startDreamStage: Policy = (world, me) => {
+export const startDreamStage: Policy = (world, me) => {
   const dream = me.dream;
   if (me.freedomWeek === null || !dream || dream.building || dream.doneWeek !== null) return null;
   const stageCost = getDream(dream.id).stages[dream.built]?.cost;
@@ -133,7 +133,7 @@ const startDreamStage: Policy = (world, me) => {
   return dreamView(world, me.id)?.canStart ? { type: 'buildDream', playerId: me.id } : null;
 };
 /** Пока мечта не готова, деньги на её следующий неоплаченный этап не идут на улучшения. */
-const dreamSavings = (me: PlayerState): number => {
+export const dreamSavings = (me: PlayerState): number => {
   const dream = me.dream;
   if (me.freedomWeek === null || !dream || dream.doneWeek !== null) return 0;
   const next = dream.building ? dream.built + 1 : dream.built;
