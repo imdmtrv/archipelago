@@ -1,5 +1,5 @@
-// Прототип «Архипелага»: острова и крупные дела. Числа — стартовые для подбора симулятором (пределы — в спецификации).
-import type { BusinessDef, BusinessId, IslandDef, IslandId } from './types';
+﻿// Прототип «Архипелага»: острова и крупные дела. Числа — стартовые для подбора симулятором (пределы — в спецификации).
+import type { BusinessDef, BusinessId, IslandDef, IslandId } from '../types';
 
 /** Пять островов, которые уже нарисованы на горизонте сцены (apps/web/src/scene/world/Ambient.tsx, NEIGHBORS). */
 export const ISLANDS: Record<IslandId, IslandDef> = {
@@ -51,3 +51,4 @@ export const SETS: Record<'fishing' | 'resort', BusinessId[]> = {
   fishing: ['cannery', 'coldStore', 'shipyard'],  // рыбная связка
   resort: ['hotel', 'shipyard', 'bank'],          // курорт
 };
+

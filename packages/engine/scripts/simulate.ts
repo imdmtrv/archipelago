@@ -1,3 +1,4 @@
+import { simulateArchipelago } from './archipelago';
 // Балансовый симулятор: много сидов × много недель, статистика по стилям игры.
 // Первый акт (путь к свободе), «Второй акт» (остаться на работе, уйти сразу, уйти при 150%),
 // «Улучшения» (разумный игрок с ними и без них) и четыре профессии на одинаковых сидах.
@@ -99,7 +100,7 @@ function runGame(seed: number, weeks: number, humanPolicy: Policy, profession: P
     s.debt = f.debt;
     s.netWorth = f.netWorth;
     s.bestLevel = p.bestLevel;
-    s.passive = realPassiveIncome(p, world.market);
+    s.passive = realPassiveIncome(p, world.market, world);
   }
   return stats;
 }
@@ -310,7 +311,15 @@ const LABELS = {
 
 function arg(name: string, fallback: number): number {
   const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? Number(process.argv[i + 1]) : fallback;
+  const key = `npm_config_${name.replaceAll('-', '_')}`;
+  const configured = process.env[key] ?? process.env[`npm_config_${name}`];
+  const flags = ['seeds', 'weeks', 'arch-seeds'].filter((flag) => process.env[`npm_config_${flag.replaceAll('-', '_')}`] !== undefined
+    || process.env[`npm_config_${flag}`] !== undefined);
+  const positional = process.argv.slice(2).filter((value) => !value.startsWith('--'));
+  const inherited = configured === 'true' ? positional[flags.indexOf(name)] : configured;
+  const value = Number(i >= 0 ? process.argv[i + 1] : inherited ?? fallback);
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`--${name}: positive integer required`);
+  return value;
 }
 
 /** Дополнительные цели первого шага вовлечённости; прежние пороги сохраняются. */
@@ -447,6 +456,7 @@ function main(): void {
   ];
   for (const [name, passed] of checks) console.log(`${passed ? 'OK  ' : 'FAIL'} ${name}`);
   if (checks.some(([, passed]) => !passed)) process.exitCode = 1;
+  simulateArchipelago(arg('arch-seeds', 300));
 }
 
 main();

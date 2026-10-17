@@ -721,7 +721,7 @@ describe('миграция старых версий → v8', () => {
     const before = JSON.stringify(raw);
     const migrated = migrateWorld(raw)!;
     expect(JSON.stringify(raw)).toBe(before);
-    expect(migrated).toMatchObject({ version: 8, upcoming: [] });
+    expect(migrated).toMatchObject({ version: 9, upcoming: [] });
     expect(player(migrated)).toMatchObject({ insuranceFrom: 12, choice: null, lastChoiceWeek: 0, lent: [], goals: { active: ['study', 'cushion', 'sectors'] } });
     expect(player(migrated)).not.toHaveProperty('promotions');
     expect(insuranceActive(player(migrated), 12)).toBe(true);
@@ -753,7 +753,7 @@ describe('миграция старых версий → v8', () => {
     const before = structuredClone(raw);
     const migrated = migrateWorld(raw)!;
     expect(raw).toEqual(before);
-    expect(migrated.version).toBe(8);
+    expect(migrated.version).toBe(9);
     expect(migrated.upcoming).toEqual([{ ...raw.upcoming[0], real: true, source: 'reliable' }]);
     expect(migrated.players.every((p) => !('promotions' in p))).toBe(true);
     expect(player(migrated).choice).toEqual(kind === 'promotion' ? null : raw.players[0].choice);

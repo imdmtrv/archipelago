@@ -1,14 +1,17 @@
-import type { Policy } from '../../src/bots';
-import { weeklyExpenses } from '../../src/economy';
-import { rumorViews } from '../../src/engagement';
-import { hashString, peekRandom } from '../../src/rng';
-import { getPlayer } from '../../src/selectors';
-import type { PlayerState, WorldState } from '../../src/types';
+import type { Policy } from '../bots';
+import { weeklyExpenses } from '../economy';
+import { rumorViews } from '../engagement';
+import { hashString, peekRandom } from '../rng';
+import { getPlayer } from '../selectors';
+import type { PlayerState, WorldState } from '../types';
 import { dreamSavings, makeSensible, startDreamStage } from '../../scripts/policies';
 import { BUSINESSES, ISLAND_ORDER, ISLANDS } from './content';
 import { daysAvailable, grossIncome, humanBusinessCount, humanShare, network, repairPrice, routeCost } from './model';
 import * as R from './rules';
-import type { ArchAction, ArchState, BusinessId, IslandId, Manager } from './types';
+import type { ArchState, BusinessId, IslandId, Manager } from '../types';
+import { isArchChoice } from './actions';
+import type { Action } from '../types';
+type ArchAction = Action extends infer A ? A extends { playerId: string } ? Omit<A, 'playerId'> : never : never;
 
 /** «Рисковый» — всё самое дорогое и в кредит; «Наобум» — случайный игрок, точка отсчёта для «удачи против умения». */
 export const STRATEGY_NAMES = ['Домосед', 'Цепочка', 'Курорт', 'Везде понемногу', 'Партнёр соседей', 'Рисковый', 'Наобум'] as const;
@@ -67,7 +70,11 @@ function credit(name: StrategyName, target: Target, world?: WorldState): number 
 
 /** null — подождать с ответом (предложение соседа ещё в силе, а на свою половину пока не хватает). */
 function decideChoice(name: StrategyName, world: WorldState, arch: ArchState): ArchAction | null {
-  const choice = arch.choice!;
+  const pending = getPlayer(world, 'p1').choice!;
+  const choice = { ...pending.params, kind: pending.kind, week: pending.week } as
+    | { kind: 'partner'; week: number; business: BusinessId; botId: string }
+    | { kind: 'bankLoan'; week: number; borrower: string; cls: 'reliable' | 'normal' | 'risky'; amount: number }
+    | { kind: 'bizBuyer'; week: number; business: BusinessId; offer: number };
   const me = getPlayer(world, 'p1');
   let accept = false;
   let loan = 0;
@@ -83,7 +90,7 @@ function decideChoice(name: StrategyName, world: WorldState, arch: ArchState): A
       accept = eligible && me.cash - buffer(me) + loan >= half;
       // Хочет в долю, но денег пока нет — ждёт, пока предложение в силе (Наобум не ждёт).
       if (!accept && eligible && name !== 'Наобум' && world.week < choice.week + R.PARTNER_WAIT_WEEKS - 1) return null;
-    } else if (choice.kind === 'loanRequest') {
+    } else if (choice.kind === 'bankLoan') {
       const crisis = name !== 'Рисковый' && name !== 'Наобум' && choice.borrower === 'npc' && choice.cls !== 'reliable'
         && rumorViews(world, 'p1').some((r) => r.kind === 'crisis' && r.source === 'reliable');
       const eligible = name === 'Рисковый' || (name === 'Наобум' && coin(world, 'loan') < 0.5) || choice.cls === 'reliable'
@@ -114,7 +121,7 @@ function management(name: StrategyName, world: WorldState, arch: ArchState): Arc
   const desired = (id: BusinessId): Manager => {
     if (name !== 'Партнёр соседей') return self.has(id) ? 'owner' : 'hired';
     if (id === 'bank') return days > 0 ? 'owner' : 'hired';
-    const neighbors = network(arch);
+    const neighbors = network(arch).filter((n) => !arch.businesses.some((b) => b.id !== id && (typeof b.manager === 'object' && b.manager.neighborId === n || b.manager === 'partner' && b.stakes.some((s) => s.playerId === n))));
     const neighbor = neighbors.includes('bot-timur') ? 'bot-timur' : ISLANDS[BUSINESSES[id].island].resident;
     // spec: пока доступного соседа нет, управляет наёмный.
     return neighbor && neighbors.includes(neighbor) ? { neighborId: neighbor } : 'hired';
@@ -127,14 +134,15 @@ function management(name: StrategyName, world: WorldState, arch: ArchState): Arc
   return null;
 }
 
-export function createStrategy(name: StrategyName, arch: ArchState): ArchStrategy {
+export function createStrategy(name: StrategyName): ArchStrategy {
   let lastRandomPurchase = -1;
   const homePolicy: Policy = (world, me) => {
+    const arch = world.archipelago;
     const base = makeSensible({ beforeBuying: startDreamStage, upgradeReserve: (player) => dreamSavings(player)
-      + (arch.openWeek !== null ? priceOrZero(remaining(name, arch, world.week)[0], arch) : 0) });
-    const action = base(world, me);
+      + (arch ? priceOrZero(remaining(name, arch, world.week)[0], arch) : 0) });
+    const action = base(world, me.choice && isArchChoice(me.choice.kind) ? { ...me, choice: null } : me);
     if (action) return action;
-    if (arch.openWeek !== null && remaining(name, arch, world.week).length === 0) {
+    if (arch && remaining(name, arch, world.week).length === 0) {
       const loan = me.loans.find((l) => !l.emergency);
       if (loan && me.cash > buffer(me)) return { type: 'repayLoan', playerId: me.id, loanUid: loan.uid,
         amount: Math.min(loan.principal, me.cash - buffer(me)) };
@@ -146,9 +154,9 @@ export function createStrategy(name: StrategyName, arch: ArchState): ArchStrateg
     const me = getPlayer(world, 'p1');
     const owned = state.businesses.filter((b) => humanShare(b) > 0);
     if (!['Домосед', 'Рисковый', 'Наобум'].includes(name) && owned.length && state.insuredFrom === null) {
-      return { type: 'setInsurance', on: true };
+      return { type: 'setArchInsurance', on: true };
     }
-    const answer = state.choice ? decideChoice(name, world, state) : null;
+    const answer = me.choice && isArchChoice(me.choice.kind) ? decideChoice(name, world, state) : null;
     if (answer) return answer;
     for (const b of owned) if (b.damaged && (name === 'Рисковый' || name === 'Наобум' ? me.cash >= 2 * repairPrice(b)
       : me.cash - buffer(me) >= repairPrice(b)) && b.stakes.every((s) => s.playerId === 'p1'

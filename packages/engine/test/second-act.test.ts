@@ -700,7 +700,7 @@ describe('миграция сохранений', () => {
 
     const world = migrateWorld(raw)!;
     expect(world).not.toBeNull();
-    expect(world.version).toBe(8);
+    expect(world.version).toBe(9);
     expect(JSON.stringify(raw)).toBe(snapshot); // вход не изменился
 
     const [human, mia, timur] = world.players;
@@ -744,7 +744,7 @@ describe('миграция сохранений', () => {
     const snapshot = JSON.stringify(raw);
     const migrated = migrateWorld(raw)!;
     expect(JSON.stringify(raw)).toBe(snapshot);
-    expect(migrated.version).toBe(8);
+    expect(migrated.version).toBe(9);
     expect(migrated.lastReport!.worldEvents[0]).toMatchObject({ id: 'storm', legacyTitle: 'Шторм', legacyText: 'Старый шторм' });
     expect(migrated.lastReport!.players.p1.events[0]).toMatchObject({ id: 'gift', legacyTitle: 'Подарок', legacyText: 'Старый подарок' });
     expect(migrated.lastReport!.news).toEqual([{ playerId: 'bot-mia', kind: 'legacy', legacyText: 'Старая новость' }]);
@@ -759,7 +759,7 @@ describe('миграция сохранений', () => {
     };
     const garbage: unknown[] = [
       null, undefined, 0, 42, 'world', true, [], {}, { version: 2 }, { version: 1, players: [] },
-      broken((w) => { w.version = 9; }),
+      broken((w) => { w.version = 10; }),
       broken((w) => { w.version = 0; }),
       broken((w) => { delete w.version; }),
       broken((w) => { w.players = 'no'; }),
