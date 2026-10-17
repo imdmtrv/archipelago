@@ -1,4 +1,5 @@
 import type { ArchState, ArchWeekLines, BusinessId, BusinessState, IslandId, Manager, PlayerState, WorldState } from '../types';
+import { INCOME_BONUS, INCOME_BONUS_KNOWLEDGE } from '../rules';
 import { BUSINESSES, ISLANDS, SETS } from './content';
 import * as R from './rules';
 
@@ -42,6 +43,12 @@ export function grossIncome(w: WorldState, a: ArchState, b: BusinessState): numb
 }
 export const managerFee = (gross: number, m: Manager): number => Math.round(gross * (m === 'hired'
   ? R.HIRED_MANAGER_SHARE : typeof m === 'object' ? R.NEIGHBOR_MANAGER_SHARE : 0));
+// The prototype booked manager fees as stable-sector deposit income. Preserve its
+// two rounding steps and knowledge bonus without creating synthetic assets.
+export function managementIncome(fee: number, p: PlayerState): number {
+  const bonus = p.knowledge >= INCOME_BONUS_KNOWLEDGE ? 1 + INCOME_BONUS : 1;
+  return Math.round(Math.round(fee / bonus) * bonus);
+}
 export function normalizeManagers(w: WorldState): void {
   const a = w.archipelago;
   if (!a) return;
@@ -66,7 +73,7 @@ export function archProjection(w: WorldState | undefined, p: PlayerState) {
       const gross = grossIncome(w, a, b);
       const manager = b.manager === 'owner' && days-- <= 0 ? 'hired' : b.manager;
       const fee = managerFee(gross, manager);
-      if (typeof manager === 'object' && manager.neighborId === p.id) management += fee;
+      if (typeof manager === 'object' && manager.neighborId === p.id) management += managementIncome(fee, p);
       const share = b.stakes.find((s) => s.playerId === p.id)?.share ?? 0;
       lines.businesses += Math.round(gross * share);
       // Round the owner's net share exactly as in the prototype.

@@ -121,7 +121,7 @@ function management(name: StrategyName, world: WorldState, arch: ArchState): Arc
   const desired = (id: BusinessId): Manager => {
     if (name !== 'Партнёр соседей') return self.has(id) ? 'owner' : 'hired';
     if (id === 'bank') return days > 0 ? 'owner' : 'hired';
-    const neighbors = network(arch).filter((n) => !arch.businesses.some((b) => b.id !== id && (typeof b.manager === 'object' && b.manager.neighborId === n || b.manager === 'partner' && b.stakes.some((s) => s.playerId === n))));
+    const neighbors = network(arch);
     const neighbor = neighbors.includes('bot-timur') ? 'bot-timur' : ISLANDS[BUSINESSES[id].island].resident;
     // spec: пока доступного соседа нет, управляет наёмный.
     return neighbor && neighbors.includes(neighbor) ? { neighborId: neighbor } : 'hired';

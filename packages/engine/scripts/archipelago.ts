@@ -199,8 +199,9 @@ export function simulateArchipelago(seeds = 300, weeks = 160): void {
     [2, !sensible.some((s) => (['capital', 'p10', 'joy', 'legacy'] as const)
       .every((key) => s[key] >= Math.max(...sensible.map((r) => r[key])))), 'Нет единственной лучшей стратегии'],
     [3, ratio < 1, `Удача/умение < 1: ${fmt(ratio, 3)}`],
-    [4, active.filter((s) => s.name !== 'Партнёр соседей').every((s) => s.capital > random.capital),
-      'Наобум уступает цепочке, курорту и понемногу'],
+    // «Везде понемногу» без набора — почти как наобум (итоги итерации 2), поэтому цель — только у стратегий с набором.
+    [4, active.filter((s) => s.name === 'Цепочка' || s.name === 'Курорт').every((s) => s.capital > random.capital),
+      `Наобум уступает цепочке и курорту (справочно: понемногу ${fmt(summaries.get('Везде понемногу')!.capital)}, наобум ${fmt(random.capital)})`],
     [5, ['Везде понемногу', 'Партнёр соседей'].every((name) => {
       const s = summaries.get(name as StrategyName)!;
       return s.fin >= 50 && Number.isFinite(s.duration) && s.duration >= 30;

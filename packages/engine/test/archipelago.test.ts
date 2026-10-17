@@ -7,7 +7,8 @@ import { realFreedomRatio, weeklyExpenses } from '../src/economy';
 import { Rng } from '../src/rng';
 import { settleWeek } from '../src/week';
 import { archipelagoView, ARCH_MAP_ORDER } from '../src/archipelago/view';
-import { activeSets, archProjection, build, createArch, grossIncome, linesNet, routeCost } from '../src/archipelago/model';
+import { activeSets, archProjection, build, createArch, grossIncome, linesNet, managementIncome, managerFee, routeCost } from '../src/archipelago/model';
+import { createStrategy } from '../src/archipelago/strategies';
 import { generateArchChoice, settleArchWeek } from '../src/archipelago/week';
 import { BUSINESSES, ISLAND_ORDER } from '../src/archipelago/content';
 import * as R from '../src/archipelago/rules';
@@ -140,6 +141,18 @@ describe('actions, ownership and managers', () => {
     expect(view.own!.managers.find((x) => typeof x.manager === 'object' && x.manager.neighborId === 'bot-timur')!.available).toBe(true);
     expect(applyAction(w, { type: 'setManager', playerId: 'p1', business: 'coldStore', manager: { neighborId: 'bot-timur' } }).error).toBeUndefined();
   });
+  it('partner strategy gives Timur a second management contract even when he manages another business', () => {
+    const w = opened(false); const a = w.archipelago!;
+    a.routes = ['lighthouse', 'shell']; a.insuredFrom = w.week;
+    build(a, 'hotel', w.week); build(a, 'coldStore', w.week);
+    a.businesses[0].manager = { neighborId: 'bot-timur' };
+    const decision = createStrategy('Партнёр соседей').decide(w, a);
+    expect(decision).toEqual({ type: 'setManager', business: 'coldStore', manager: { neighborId: 'bot-timur' } });
+    const done = act(w, { ...decision!, playerId: 'p1' });
+    expect(done.archipelago!.businesses.map((b) => b.manager)).toEqual([
+      { neighborId: 'bot-timur' }, { neighborId: 'bot-timur' },
+    ]);
+  });
   it('hands excess owner days to hired managers during dream construction', () => {
     const w = opened(); build(w.archipelago!, 'hotel', 1); player(w).dream!.building = true;
     const done = settleWeek(w, []);
@@ -268,6 +281,37 @@ describe('real finances and reports', () => {
     expect(done.lastReport!.players['bot-timur'].arch).toBeNull();
     expect(done.archipelago!.log.paidToNeighbors).toBe(f.arch.income);
   });
+  it('credits both management fees to Timur in cash and the freedom calculation', () => {
+    const w = opened(false); const a = w.archipelago!; a.routes = ['lighthouse', 'shell'];
+    build(a, 'hotel', w.week); build(a, 'coldStore', w.week);
+    for (const b of a.businesses) b.manager = { neighborId: 'bot-timur' };
+    const timur = player(w, 'bot-timur');
+    const fees = a.businesses.reduce((n, b) => n + managerFee(grossIncome(w, a, b), b.manager), 0);
+    expect(archProjection(w, timur).management).toBe(fees);
+    const noArch = { ...w, archipelago: null };
+    const before = financeView(noArch, timur.id);
+    const withArch = financeView(w, timur.id);
+    expect(withArch.passiveIncome).toBe(before.passiveIncome + fees);
+    expect(realFreedomRatio(timur, w.market, w)).toBe(withArch.freedomRatio);
+    const originalCash = timur.cash;
+    const settled = settleWeek(w, []);
+    const botReport = settled.lastReport!.players[timur.id];
+    expect(botReport.net).toBe(botReport.salary + botReport.assetIncome.reduce((n, x) => n + x.amount, 0)
+      - botReport.upkeep.reduce((n, x) => n + x.amount, 0) - botReport.living - botReport.interest
+      - botReport.insurance + botReport.eventsCash + fees);
+    expect(player(settled, timur.id).cash).toBe(originalCash + botReport.net);
+  });
+  it('keeps stable-sector income and prototype rounding for a knowledgeable manager', () => {
+    const w = opened(false); const a = w.archipelago!;
+    a.routes = ['lighthouse']; build(a, 'coldStore', w.week);
+    a.businesses[0].manager = { neighborId: 'bot-timur' };
+    const timur = player(w, 'bot-timur'); timur.knowledge = 3;
+    expect(managementIncome(5, timur)).toBe(6); // deposit-equivalent: round(round(5 / 1.1) * 1.1)
+    const expected = managementIncome(managerFee(grossIncome(w, a, a.businesses[0]), a.businesses[0].manager), timur);
+    expect(archProjection(w, timur).management).toBe(expected);
+    w.market.fish = 0.5; w.market.tourism = 2;
+    expect(archProjection(w, timur).management).toBe(expected);
+  });
   it('fish effects are real home-asset income, including effects of mainland businesses', () => {
     const w = opened(); w.archipelago!.routes = ['pelican', 'lighthouse']; w.market.fish = 0.5;
     giveAsset(w, 'p1', 'boat', { income: 100 }); build(w.archipelago!, 'cannery', 1, 'mainland'); build(w.archipelago!, 'coldStore', 1, 'mainland');
@@ -281,11 +325,15 @@ describe('real finances and reports', () => {
     player(w).choice = { uid: 'bank', kind: 'bankLoan', week: 1,
       params: { borrower: 'bot-timur', cls: 'normal', amount: 2000, weeklyRate: 0.022, term: 8 } };
     expect(choiceView(w, 'p1')).toMatchObject({ kind: 'bankLoan', weeklyInterest: 44, defaultChance: R.BANK_DEFAULT.normal });
+    const timurCash = player(w, 'bot-timur').cash;
     w = act(w, { type: 'resolveChoice', playerId: 'p1', accept: true });
+    expect(player(w, 'bot-timur').cash).toBe(timurCash + 2000);
     expect(financeView(w, 'p1').arch.income).toBe(44);
     w = settleWeek(w, []); expect(w.lastReport!.players.p1.arch!.bankInterest).toBe(0);
     w.week = 9; w = settleWeek(w, []);
     expect(w.lastReport!.players.p1.arch!.bankInterest).toBe(352);
+    const botReport = w.lastReport!.players['bot-timur'];
+    expect(botReport.eventsCash - botReport.events.reduce((n, e) => n + (e.cashDelta ?? 0), 0)).toBe(-2352);
     expect(w.archipelago!.loans).toEqual([]);
     expect(w.lastReport!.players.p1.net).toBe(sumReport(w));
   });
