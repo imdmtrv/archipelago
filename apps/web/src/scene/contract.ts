@@ -1,5 +1,5 @@
 // Контракт между UI и 3D-сценой. UI знает только эти типы и компонент <IslandScene />.
-import type { ModelId, SlotType } from '@arch/engine';
+import type { BusinessId, IslandId, ModelId, SlotType } from '@arch/engine';
 
 /** Объект, который стоит на острове (купленный актив или статусная вещь). */
 export interface PlacedItem {
@@ -58,4 +58,42 @@ export interface IslandSceneProps {
   cameraPose?: () => CameraPose;
   dpr?: number;
   onItemClick?: (uid: string) => void;
+  /** Режим «Архипелаг»; null/нет — архипелаг закрыт, сцена как раньше. */
+  arch?: ArchSceneProps | null;
 }
+
+// ───────────── Архипелаг (docs/specs/archipelago-screen.md, «Режим «Архипелаг»») ─────────────
+
+/** Иконки дел — на метках над островами, в карточках и на схеме без WebGL. */
+export const ARCH_ICONS: Record<BusinessId, string> = {
+  cannery: '🏭', hotel: '🏨', coldStore: '❄️', shipyard: '⚓', bank: '🏦',
+};
+
+/** Цвет крыши здания и метки: бумага / золото / бирюза / серый. Доля в партнёрстве — 'mine'. */
+export type ArchOwnerTone = 'free' | 'mine' | 'neighbor' | 'mainland';
+
+export interface ArchSceneIsland {
+  island: IslandId;
+  business: BusinessId;
+  route: boolean;            // паром проведён: пунктирная дуга, лодочка, причал с паромом
+  built: boolean;            // дело построено: здание; иначе — участок с колышками и табличкой
+  tone: ArchOwnerTone;
+  damaged: boolean;          // тёмная заплата и дымок, красная точка на метке
+  label: string;             // готовый текст метки: «🏭 Пеликан · ваше»
+  attention: boolean;        // есть что решить — метка заметнее
+}
+
+export interface ArchSceneProps {
+  /** Режим включён: камера на общем виде (или у острова focus); выключен — обычный вид родного острова. */
+  on: boolean;
+  focus: IslandId | null;
+  islands: ArchSceneIsland[];
+  /** Нажатие на остров или его метку (UI вызывает setArchFocus и раскрывает карточку). */
+  onIslandClick: (island: IslandId) => void;
+}
+
+/**
+ * Флаг для приёмки: после окончания перелёта сцена пишет document.documentElement.dataset.archCamera =
+ * 'home' | 'overview' | <IslandId>. Пока камера летит — 'flying'.
+ */
+export const ARCH_CAMERA_FLAG = 'archCamera';
