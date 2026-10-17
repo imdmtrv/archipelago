@@ -131,14 +131,14 @@ describe('actions, ownership and managers', () => {
     w = act(w, { type: 'buyBusiness', playerId: 'p1', business: 'bank', loan: 0 });
     expect(w.archipelago!.businesses.find((b) => b.id === 'coldStore')!.stakes[0].playerId).toBe('mainland');
   });
-  it('enforces days and a single assignment per neighbor', () => {
+  it('enforces days; one neighbor may manage several businesses', () => {
     let w = opened(false); const a = w.archipelago!; a.routes = [...ISLAND_ORDER];
     build(a, 'hotel', 1); build(a, 'coldStore', 1);
     expect(applyAction(w, { type: 'setManager', playerId: 'p1', business: 'coldStore', manager: 'owner' }).error?.code).toBe('noDays');
     w = act(w, { type: 'setManager', playerId: 'p1', business: 'hotel', manager: { neighborId: 'bot-timur' } });
-    expect(applyAction(w, { type: 'setManager', playerId: 'p1', business: 'coldStore', manager: { neighborId: 'bot-timur' } }).error?.code).toBe('managerBusy');
     const view = archipelagoView(w, 'p1')!.islands.find((x) => x.business === 'coldStore')!;
-    expect(view.own!.managers.find((x) => typeof x.manager === 'object' && x.manager.neighborId === 'bot-timur')!.reason?.code).toBe('managerBusy');
+    expect(view.own!.managers.find((x) => typeof x.manager === 'object' && x.manager.neighborId === 'bot-timur')!.available).toBe(true);
+    expect(applyAction(w, { type: 'setManager', playerId: 'p1', business: 'coldStore', manager: { neighborId: 'bot-timur' } }).error).toBeUndefined();
   });
   it('hands excess owner days to hired managers during dream construction', () => {
     const w = opened(); build(w.archipelago!, 'hotel', 1); player(w).dream!.building = true;

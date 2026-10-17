@@ -646,7 +646,7 @@ export interface ArchManagerOption {
   feeShare: number;          // 0 — сам, HIRED_MANAGER_SHARE, NEIGHBOR_MANAGER_SHARE
   current: boolean;
   available: boolean;
-  /** noDays — нет свободных дней; managerBusy — сосед уже управляет другим делом. */
+  /** noDays — нет свободных дней; noRoute — сосед вне сети. Сосед может управлять несколькими делами (как в прототипе). */
   reason?: EngineError;
 }
 

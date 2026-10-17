@@ -24,8 +24,6 @@ export function managerError(w: WorldState, id: BusinessId, manager: Manager): E
   if (manager === 'owner' && a.businesses.filter((b) => b.id !== id && b.manager === 'owner').length >= daysAvailable(w.players[0])) return error('noDays');
   if (typeof manager === 'object') {
     if (!w.players.some((p) => p.isBot && p.id === manager.neighborId) || !network(a).includes(manager.neighborId)) return error('noRoute');
-    if (a.businesses.some((b) => b.id !== id && (typeof b.manager === 'object' && b.manager.neighborId === manager.neighborId
-      || b.manager === 'partner' && b.stakes.some((s) => s.playerId === manager.neighborId)))) return error('managerBusy');
   }
   return null;
 }

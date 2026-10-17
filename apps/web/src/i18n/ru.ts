@@ -541,7 +541,7 @@ export const ru = {
           `Место: ${['первое', 'второе', 'третье', 'четвёртое'][n - 1] ?? n} из ${['одного', 'двух', 'трёх', 'четырёх'][max - 1] ?? max}`,
         accept: (coins: string) => `Войти в долю за ${coins}`,
         later: (weeks: string) => `Подумаю (ещё ${weeks})`,
-        decline: (female: boolean) => (female ? 'Пусть строит сама' : 'Пусть строит сам'),
+        decline: (female: boolean): string => (female ? 'Пусть строит сама' : 'Пусть строит сам'),
       },
       bankLoan: {
         npc: 'Приезжий',
