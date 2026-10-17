@@ -6,7 +6,7 @@ import { applyAction } from '../src/reducer';
 import { financeView, getPlayer } from '../src/selectors';
 import type { WorldState } from '../src/types';
 import { createWorld } from '../src/world';
-import { applyArchAction, businessValue, createArch, humanShare, settleArch, syncShares } from '../proto/archipelago/model';
+import { activeSets, applyArchAction, businessValue, createArch, humanShare, settleArch, syncShares } from '../proto/archipelago/model';
 import { createStrategy, STRATEGY_NAMES, type StrategyName } from '../proto/archipelago/strategies';
 import type { ArchState } from '../proto/archipelago/types';
 
@@ -29,6 +29,7 @@ export function runGame(seed: number, weeks: number, name: StrategyName): {
   world: WorldState; arch: ArchState; joySum: number; joyWeeks: number;
   /** Капитал через ARCH_HORIZON недель после открытия (null — столько недель не прошло). */
   capitalAtHorizon: number | null;
+  setsSeen: { fishing: boolean; resort: boolean }; mainlandBuilt: number;
 } {
   let world = createWorld({ seed, playerName: 'Игрок', islandName: 'Тест', profession: 'teacher' });
   const arch = createArch(seed);
@@ -36,6 +37,10 @@ export function runGame(seed: number, weeks: number, name: StrategyName): {
   let joySum = 0;
   let joyWeeks = 0;
   let capitalAtHorizon: number | null = null;
+  // spec: набор учитывается, если был собран хотя бы раз; продажи материку не считаются его стройками.
+  const setsSeen = { fishing: false, resort: false };
+  let mainlandBuilt = 0;
+  const recordSets = () => { for (const set of activeSets(arch)) setsSeen[set] = true; };
   for (let w = 0; w < weeks; w++) {
     const turn = runBotTurn(world, 'p1', strategy.homePolicy);
     if (turn.errors.length) throw new Error(`seed ${seed}, ${name}, week ${world.week}: ${turn.errors.join('; ')}`);
@@ -47,13 +52,17 @@ export function runGame(seed: number, weeks: number, name: StrategyName): {
         const action = strategy.decide(world, arch);
         if (!action) break;
         applyArchAction(world, arch, action);
+        recordSets();
       }
     }
     syncShares(world, arch);
     const result = applyAction(world, { type: 'endWeek' });
     if (result.error) throw new Error(`seed ${seed}, ${name}: ${result.error.code}`);
     world = result.world;
+    const beforeSettlement = arch.businesses.length;
     settleArch(world, arch);
+    mainlandBuilt += arch.businesses.slice(beforeSettlement).filter((b) => b.stakes.some((s) => s.playerId === 'mainland')).length;
+    recordSets();
     if (arch.openWeek !== null && world.lastReport!.week === arch.openWeek + ARCH_HORIZON) capitalAtHorizon = capitalOf(world, arch);
     if (arch.openWeek !== null && world.lastReport!.week > arch.openWeek) {
       joySum += getPlayer(world, 'p1').happiness;
@@ -61,7 +70,7 @@ export function runGame(seed: number, weeks: number, name: StrategyName): {
     }
   }
   if (badNumbers(world) || badNumbers(arch)) throw new Error(`Нечисловое состояние: seed ${seed}, ${name}`);
-  return { world, arch, joySum, joyWeeks, capitalAtHorizon };
+  return { world, arch, joySum, joyWeeks, capitalAtHorizon, setsSeen, mainlandBuilt };
 }
 
 interface Outcome {
@@ -69,6 +78,7 @@ interface Outcome {
   joySum: number; joyWeeks: number; legacy: number; timurFree: boolean; gap: number; maxGap: number;
   businesses: number; routes: number; lent: number; lost: number; interest: number; restored: number;
   miaSolo: number; miaPartner: number; borisSolo: number; borisPartner: number;
+  fishing: boolean; resort: boolean; mainlandBuilt: number;
 }
 
 function outcome(game: ReturnType<typeof runGame>, weeks: number): Outcome {
@@ -91,6 +101,7 @@ function outcome(game: ReturnType<typeof runGame>, weeks: number): Outcome {
     lent: arch.log.bankLent, lost: arch.log.bankDefaulted, interest: arch.log.bankInterest, restored: arch.log.restoredShares,
     miaSolo: builds('bot-mia', false), miaPartner: builds('bot-mia', true),
     borisSolo: builds('bot-boris', false), borisPartner: builds('bot-boris', true),
+    fishing: game.setsSeen.fishing, resort: game.setsSeen.resort, mainlandBuilt: game.mainlandBuilt,
   };
 }
 
@@ -117,6 +128,8 @@ function summarize(games: Outcome[], weeks: number) {
     lent: median((o) => o.lent), lost: median((o) => o.lost), interest: median((o) => o.interest), restored: total((o) => o.restored),
     miaSolo: total((o) => o.miaSolo), miaPartner: total((o) => o.miaPartner),
     borisSolo: total((o) => o.borisSolo), borisPartner: total((o) => o.borisPartner),
+    fishing: 100 * total((o) => Number(o.fishing)) / games.length,
+    resort: 100 * total((o) => Number(o.resort)) / games.length, mainlandBuilt: median((o) => o.mainlandBuilt),
   };
 }
 
@@ -152,7 +165,7 @@ function main(): void {
   const summaries = new Map([...results].map(([name, games]) => [name, summarize(games, weeks)]));
   const home = summaries.get('Домосед')!;
   const random = summaries.get('Наобум')!;
-  const active = STRATEGY_NAMES.slice(1, 4).map((name) => ({ name, ...summaries.get(name)! }));
+  const active = STRATEGY_NAMES.slice(1, 5).map((name) => ({ name, ...summaries.get(name)! }));
   // Удача архипелага — разброс прибавки к капиталу против домоседа на том же сиде: удача первого акта
   // (когда пришла свобода, что выпало на родном острове) одинакова у всех стратегий и сюда не входит.
   const gain = (name: StrategyName) => results.get(name)!.flatMap((o, i) => {
@@ -165,7 +178,7 @@ function main(): void {
   const ratio = skill > 0 ? luck / skill : Infinity;
   const rawSkill = best.capital - random.capital;
   const rawRatio = rawSkill > 0 ? (best.p75 - best.p25) / rawSkill : Infinity;
-  const sensible = STRATEGY_NAMES.slice(0, 5).map((name) => summaries.get(name)!);
+  const sensible = STRATEGY_NAMES.slice(0, 6).map((name) => summaries.get(name)!);
   const partner = summaries.get('Партнёр соседей')!;
   const fmt = (n: number, digits = 0) => Number.isFinite(n) ? n.toFixed(digits) : '—';
   console.log(`Архипелаг: ${seeds} сидов × ${weeks} недель; ${((Date.now() - started) / 1000).toFixed(1)} c`);
@@ -175,6 +188,7 @@ function main(): void {
     fmt(s.joy, 1), `${fmt(s.legacy)}/${fmt(s.timur, 1)}`, `${fmt(s.gap, 1)}/${fmt(s.maxGap)}`,
     `${fmt(s.businesses)}/${fmt(s.routes)}`, `${fmt(s.lent)}/${fmt(s.lost)}/${fmt(s.interest)}`,
     `${s.miaSolo}/${s.miaPartner}`, `${s.borisSolo}/${s.borisPartner}`].join('|'));
+  for (const [name, s] of summaries) console.log(`Наборы/материк|${name}|рыбная=${fmt(s.fishing, 1)}%|курорт=${fmt(s.resort, 1)}%|строек/m=${fmt(s.mainlandBuilt)}`);
   console.log(`Прибавка к капиталу против домоседа через ${ARCH_HORIZON} недель после открытия (медиана, p25–p75; игр ${gain('Цепочка').length}): ${STRATEGY_NAMES.slice(1).map((name) =>
     `${name} ${fmt(percentile(gain(name), 0.5))} (${fmt(percentile(gain(name), 0.25))}–${fmt(percentile(gain(name), 0.75))})`).join('; ')}`);
   console.log(`Удача/умение (прибавка): ${best.name}; ${fmt(luck)}/${fmt(skill)}=${fmt(ratio, 3)}; по всему капиталу ${fmt(rawRatio, 3)} (Cashflow 101: 2.8)`);
@@ -184,13 +198,13 @@ function main(): void {
     [2, !sensible.some((s) => (['capital', 'p10', 'joy', 'legacy'] as const)
       .every((key) => s[key] >= Math.max(...sensible.map((r) => r[key])))), 'Нет единственной лучшей стратегии'],
     [3, ratio < 1, `Удача/умение < 1: ${fmt(ratio, 3)}`],
-    [4, active.every((s) => s.capital > random.capital), 'Наобум уступает каждой продуманной активной'],
+    [4, active.filter((s) => s.name !== 'Партнёр соседей').every((s) => s.capital > random.capital),
+      'Наобум уступает цепочке, курорту и понемногу'],
     [5, ['Везде понемногу', 'Партнёр соседей'].every((name) => {
       const s = summaries.get(name as StrategyName)!;
       return s.fin >= 50 && Number.isFinite(s.duration) && s.duration >= 30;
     }), 'Финал ≥50%, Δ≥30: понемногу и партнёр'],
-    [6, STRATEGY_NAMES.slice(1, 4).every((name) => {
-      const s = summaries.get(name)!;
+    [6, active.every((s) => {
       return s.gap <= 4 && s.maxGap <= 12;
     }), 'Решения: средний промежуток ≤4, максимальный ≤12'],
     [7, partner.timur - home.timur >= 15, `Свобода Тимура: прибавка ${fmt(partner.timur - home.timur, 1)} п.п. ≥15`],

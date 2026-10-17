@@ -5,14 +5,14 @@ import { hashString, Rng } from '../../src/rng';
 import { INCOME_BONUS, INCOME_BONUS_KNOWLEDGE, INSURANCE_WAIT_WEEKS } from '../../src/rules';
 import { getPlayer } from '../../src/selectors';
 import type { OwnedAsset, PlayerState, WorldState } from '../../src/types';
-import { BUSINESSES, ISLANDS, ISLAND_ORDER } from './content';
+import { BUSINESSES, ISLANDS, ISLAND_ORDER, SETS } from './content';
 import * as R from './rules';
 import type { ArchAction, ArchState, BankClass, BusinessId, BusinessState, IslandId, Manager } from './types';
 
 export function createArch(seed: number): ArchState {
   return {
     openWeek: null, routes: [], businesses: [], loans: [], insuredFrom: null,
-    choice: null, finaleWeek: null, rng: hashString(`arch:${seed}`), nextUid: 1, syncedShares: [],
+    choice: null, mainlandFrom: null, finaleWeek: null, rng: hashString(`arch:${seed}`), nextUid: 1, syncedShares: [],
     log: { decisionWeeks: [], homeDecisionWeeks: [], paidToNeighbors: 0, bankLent: 0, bankDefaulted: 0,
       bankInterest: 0, repairs: 0, businessIncome: 0, restoredShares: 0 },
   };
@@ -28,6 +28,15 @@ export function reach(arch: ArchState, island: IslandId): string[] {
 
 export function humanShare(business: BusinessState): number {
   return business.stakes.find((s) => s.playerId === 'p1')?.share ?? 0;
+}
+
+export function humanBusinessCount(arch: ArchState): number {
+  return arch.businesses.filter((b) => humanShare(b) > 0).length;
+}
+
+export function activeSets(arch: ArchState): (keyof typeof SETS)[] {
+  return (Object.keys(SETS) as (keyof typeof SETS)[]).filter((set) => SETS[set]
+    .every((id) => arch.businesses.some((b) => b.id === id && humanShare(b) > 0)));
 }
 
 export function daysAvailable(player: PlayerState): number {
@@ -51,6 +60,7 @@ export function businessValue(business: BusinessState, playerId = 'p1'): number 
 export function grossIncome(world: WorldState, arch: ArchState, business: BusinessState): number {
   if (business.damaged) return 0;
   const def = BUSINESSES[business.id];
+  let gross: number;
   switch (business.id) {
     case 'cannery': {
       const boats = reach(arch, 'pelican').reduce((sum, id) => sum + getPlayer(world, id).owned
@@ -58,13 +68,16 @@ export function grossIncome(world: WorldState, arch: ArchState, business: Busine
       // Склад и завод вместе: холодильник хранит улов для завода, и завод не простаивает в дешёвую рыбу.
       const stored = intact(arch, 'coldStore') && arch.routes.includes('lighthouse') && arch.routes.includes('pelican');
       const fish = stored ? Math.max(world.market.fish, R.COLD_STORE_FISH_FLOOR) : world.market.fish;
-      return Math.round(def.baseIncome * fish + R.CANNERY_PER_BOAT * boats);
+      gross = Math.round(def.baseIncome * fish + R.CANNERY_PER_BOAT * boats);
+      break;
     }
-    case 'hotel': return Math.round(def.baseIncome * world.market.tourism
-      * (1 + R.HOTEL_PER_ISLAND * reach(arch, 'shell').length));
-    case 'shipyard': return Math.round(def.baseIncome + R.SHIPYARD_PER_ROUTE * arch.routes.length);
-    default: return def.baseIncome;
+    case 'hotel': gross = Math.round(def.baseIncome * world.market.tourism
+      * (1 + R.HOTEL_PER_ISLAND * reach(arch, 'shell').length)); break;
+    case 'shipyard': gross = Math.round(def.baseIncome + R.SHIPYARD_PER_ROUTE * arch.routes.length); break;
+    default: gross = def.baseIncome;
   }
+  // spec: бонус умножает уже округлённый доход первой итерации; результат снова округляется до монет.
+  return activeSets(arch).some((set) => SETS[set].includes(business.id)) ? Math.round(gross * (1 + R.SET_BONUS)) : gross;
 }
 
 function managerFee(gross: number, manager: Manager): number {
@@ -104,6 +117,7 @@ function resolveChoice(world: WorldState, arch: ArchState, accept: boolean, loan
     const bot = getPlayer(world, choice.botId);
     requireAction(!arch.businesses.some((b) => b.id === choice.business), 'дело уже построено');
     if (accept) {
+      requireAction(humanBusinessCount(arch) < R.MAX_HUMAN_BUSINESSES, 'достигнут предел дел человека');
       requireAction(bot.cash >= def.price * (1 - R.PARTNER_SHARE), 'партнёру не хватает денег');
       fund(world, def.price * R.PARTNER_SHARE, loan, def.price * R.PARTNER_SHARE * R.BUSINESS_LOAN_SHARE);
       bot.cash -= def.price * (1 - R.PARTNER_SHARE);
@@ -143,6 +157,7 @@ export function applyArchAction(world: WorldState, arch: ArchState, action: Arch
       const def = BUSINESSES[action.business];
       requireAction(!!def && arch.routes.includes(def.island), 'остров не в сети');
       requireAction(!arch.businesses.some((b) => b.id === action.business), 'дело уже построено');
+      requireAction(humanBusinessCount(arch) < R.MAX_HUMAN_BUSINESSES, 'достигнут предел дел человека');
       fund(world, def.price, action.loan, def.price * R.BUSINESS_LOAN_SHARE);
       build(arch, action.business, world.week);
       break;
@@ -335,8 +350,22 @@ export function settleArch(world: WorldState, arch: ArchState): void {
   settleLoans(world, arch, week, rng);
   // 5.6: week развилки — неделя ответа, как в движке.
   if (arch.choice && arch.choice.week <= week) resolveChoice(world, arch, false);
-  // 5.7–5.9.
+  // 5.7: открытие архипелага.
   if (arch.openWeek === null && realFreedomRatio(me, world.market) >= R.OPEN_RATIO) arch.openWeek = week;
+  // 5.8а: материк строит до новых развилок, не забирая деньги и не сдвигая ГПСЧ.
+  if (arch.openWeek !== null) {
+    if (arch.mainlandFrom === null && (humanBusinessCount(arch) >= R.MAX_HUMAN_BUSINESSES
+      || week >= arch.openWeek + R.MAINLAND_FALLBACK)) arch.mainlandFrom = week;
+    if (arch.mainlandFrom !== null && week >= arch.mainlandFrom && (week - arch.mainlandFrom) % R.MAINLAND_STEP === 0) {
+      const next = Object.values(BUSINESSES).filter((def) => !arch.businesses.some((b) => b.id === def.id))
+        .sort((a, b) => a.price - b.price)[0];
+      if (next) {
+        build(arch, next.id, week, 'mainland');
+        if (arch.choice?.kind === 'partner' && arch.choice.business === next.id) arch.choice = null;
+      }
+    }
+  }
+  // 5.8–5.9: развилки и финал.
   nextChoice(world, arch, week, rng);
   if (arch.finaleWeek === null && arch.routes.length === ISLAND_ORDER.length
     && arch.businesses.length === ISLAND_ORDER.length) arch.finaleWeek = week;

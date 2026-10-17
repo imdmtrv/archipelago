@@ -6,12 +6,12 @@ import { getPlayer } from '../../src/selectors';
 import type { PlayerState, WorldState } from '../../src/types';
 import { dreamSavings, makeSensible, startDreamStage } from '../../scripts/policies';
 import { BUSINESSES, ISLAND_ORDER, ISLANDS } from './content';
-import { daysAvailable, grossIncome, humanShare, network, repairPrice, routeCost } from './model';
+import { daysAvailable, grossIncome, humanBusinessCount, humanShare, network, repairPrice, routeCost } from './model';
 import * as R from './rules';
 import type { ArchAction, ArchState, BusinessId, IslandId, Manager } from './types';
 
 /** «Рисковый» — всё самое дорогое и в кредит; «Наобум» — случайный игрок, точка отсчёта для «удачи против умения». */
-export const STRATEGY_NAMES = ['Домосед', 'Цепочка', 'Везде понемногу', 'Партнёр соседей', 'Рисковый', 'Наобум'] as const;
+export const STRATEGY_NAMES = ['Домосед', 'Цепочка', 'Курорт', 'Везде понемногу', 'Партнёр соседей', 'Рисковый', 'Наобум'] as const;
 export type StrategyName = typeof STRATEGY_NAMES[number];
 export interface ArchStrategy {
   homePolicy: Policy;
@@ -25,6 +25,8 @@ const TARGETS: Record<Exclude<StrategyName, 'Рисковый' | 'Наобум'>
   'Домосед': [],
   'Цепочка': [route('pelican'), business('cannery'), route('lighthouse'), business('coldStore'),
     route('cedar'), business('shipyard'), route('shell'), business('hotel'), route('big'), business('bank')],
+  'Курорт': [route('shell'), business('hotel'), route('cedar'), business('shipyard'), route('big'), business('bank'),
+    route('lighthouse'), business('coldStore'), route('pelican'), business('cannery')],
   'Везде понемногу': [route('lighthouse'), route('pelican'), route('shell'), route('cedar'), route('big'),
     business('coldStore'), business('bank'), business('shipyard'), business('cannery'), business('hotel')],
   'Партнёр соседей': [route('shell'), route('pelican'), route('lighthouse'), business('coldStore'),
@@ -39,13 +41,15 @@ function price(target: Target, arch: ArchState): number {
   return 'island' in target ? routeCost(arch) : BUSINESSES[target.business].price;
 }
 
-function remaining(name: StrategyName, arch: ArchState): Target[] {
+function remaining(name: StrategyName, arch: ArchState, week: number): Target[] {
   const targets = name === 'Рисковый' || name === 'Наобум' ? [
     ...ISLAND_ORDER.filter((id) => !arch.routes.includes(id)).map(route),
     ...Object.values(BUSINESSES).filter((b) => arch.routes.includes(b.island)).map((b) => business(b.id)),
   ] : TARGETS[name];
+  // spec: партнёр до openWeek + 30 ждёт с покупкой остальных дел; паромы строит и во время ожидания.
   const todo = targets.filter((t) => 'island' in t ? !arch.routes.includes(t.island)
-    : !arch.businesses.some((b) => b.id === t.business));
+    : humanBusinessCount(arch) < R.MAX_HUMAN_BUSINESSES && !arch.businesses.some((b) => b.id === t.business)
+      && (name !== 'Партнёр соседей' || t.business === 'coldStore' || week >= arch.openWeek! + 30));
   return name === 'Рисковый' ? todo.sort((a, b) => price(b, arch) - price(a, arch)) : todo;
 }
 
@@ -55,10 +59,10 @@ function coin(world: WorldState, salt: string): number {
 }
 
 function credit(name: StrategyName, target: Target, world?: WorldState): number {
-  // spec: «до 50%» у Цепочки — максимальный разрешённый кредит; Наобум берёт его через раз.
+  // spec: «до 50%» у Цепочки и Курорта — максимальный разрешённый кредит; Наобум берёт его через раз.
   const max = 'business' in target ? BUSINESSES[target.business].price * R.BUSINESS_LOAN_SHARE : 0;
   if (name === 'Наобум') return world && coin(world, `loan:${'business' in target ? target.business : ''}`) < 0.5 ? max : 0;
-  return name === 'Цепочка' || name === 'Рисковый' ? max : 0;
+  return name === 'Цепочка' || name === 'Курорт' || name === 'Рисковый' ? max : 0;
 }
 
 function decideChoice(name: StrategyName, world: WorldState, arch: ArchState): ArchAction {
@@ -69,7 +73,10 @@ function decideChoice(name: StrategyName, world: WorldState, arch: ArchState): A
   if (name !== 'Домосед') {
     if (choice.kind === 'partner') {
       const half = BUSINESSES[choice.business].price * R.PARTNER_SHARE;
-      const eligible = (name !== 'Цепочка' || choice.business === 'cannery') && (name !== 'Наобум' || coin(world, 'partner') < 0.5);
+      const eligible = humanBusinessCount(arch) < R.MAX_HUMAN_BUSINESSES
+        && (name !== 'Цепочка' || choice.business === 'cannery') && (name !== 'Курорт' || choice.business === 'hotel')
+        && (name !== 'Наобум' || coin(world, 'partner') < 0.5)
+        && getPlayer(world, choice.botId).cash >= BUSINESSES[choice.business].price * (1 - R.PARTNER_SHARE);
       loan = name === 'Везде понемногу' ? 0 : half * R.BUSINESS_LOAN_SHARE;
       // spec: «всегда» — согласие, когда половину можно оплатить с общим запасом.
       accept = eligible && me.cash - buffer(me) + loan >= half;
@@ -121,10 +128,10 @@ export function createStrategy(name: StrategyName, arch: ArchState): ArchStrateg
   let lastRandomPurchase = -1;
   const homePolicy: Policy = (world, me) => {
     const base = makeSensible({ beforeBuying: startDreamStage, upgradeReserve: (player) => dreamSavings(player)
-      + (arch.openWeek !== null ? priceOrZero(remaining(name, arch)[0], arch) : 0) });
+      + (arch.openWeek !== null ? priceOrZero(remaining(name, arch, world.week)[0], arch) : 0) });
     const action = base(world, me);
     if (action) return action;
-    if (arch.openWeek !== null && remaining(name, arch).length === 0) {
+    if (arch.openWeek !== null && remaining(name, arch, world.week).length === 0) {
       const loan = me.loans.find((l) => !l.emergency);
       if (loan && me.cash > buffer(me)) return { type: 'repayLoan', playerId: me.id, loanUid: loan.uid,
         amount: Math.min(loan.principal, me.cash - buffer(me)) };
@@ -151,7 +158,7 @@ export function createStrategy(name: StrategyName, arch: ArchState): ArchStrateg
     if (once && lastRandomPurchase === world.week) return null;
     // Наобум покупает через неделю что-нибудь из того, что по карману.
     if (name === 'Наобум' && coin(world, 'buy') >= 0.5) return null;
-    const todo = remaining(name, state);
+    const todo = remaining(name, state, world.week);
     const fits = (t: Target) => me.cash - buffer(me) + credit(name, t, world) >= price(t, state);
     const affordable = todo.filter(fits);
     const target = name === 'Рисковый' ? affordable[0]
