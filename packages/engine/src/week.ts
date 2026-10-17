@@ -94,6 +94,7 @@ function settlePlayer(world: WorldState, player: PlayerState, rng: Rng): PlayerW
     events,
     lostAssetUids: [],
     freedomReached: false,
+    arch: null, // TODO(Codex 1): строки архипелага
   };
 }
 

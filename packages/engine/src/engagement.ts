@@ -38,6 +38,7 @@ export function choiceView(world: WorldState, playerId: string): ChoiceView | nu
       freedomBefore: ratio(player), freedomAfter: ratio({ ...player, owned: [...player.owned, { ...asset, price }] }),
       canAccept: reason === null, ...(reason ? { reason } : {}) };
   }
+  if (choice.kind !== 'buyer') return null; // TODO(Codex 1): partner, bankLoan, bizBuyer
   const asset = buyerAsset(player, choice.params.assetUid);
   if (!asset) return null;
   return { kind: choice.kind, uid: choice.uid, assetUid: asset.uid, defId: asset.defId, level: asset.level,

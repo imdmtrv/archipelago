@@ -25,7 +25,7 @@ class ZeroRng extends Rng {
 function emptyReport(playerId: string): PlayerWeekReport {
   return {
     playerId, salary: 0, assetIncome: [], upkeep: [], living: 0, interest: 0, insurance: 0,
-    eventsCash: 0, net: 0, cashAfter: 0, happinessDelta: 0, events: [], lostAssetUids: [], freedomReached: false,
+    eventsCash: 0, net: 0, cashAfter: 0, happinessDelta: 0, events: [], lostAssetUids: [], freedomReached: false, arch: null,
   };
 }
 

@@ -210,9 +210,14 @@ const buildDream: Handler<Extract<PlayerAction, { type: 'buildDream' }>> = (_wor
 const resolveChoice: Handler<Extract<PlayerAction, { type: 'resolveChoice' }>> = (world, player, action) =>
   resolvePendingChoice(world, player, action.accept);
 
+// TODO(Codex 1): действия архипелага (archipelago/actions.ts).
+const archTodo: Handler<PlayerAction> = () => err('archClosed');
+
 const HANDLERS: { [T in PlayerAction['type']]: Handler<Extract<PlayerAction, { type: T }>> } = {
   buyOffer, sellAsset, repairAsset, upgradeAsset, takeLoan, repayLoan, setInsurance, setExtraShift, study, rest,
   quitJob, returnToWork, buildDream, resolveChoice,
+  deferChoice: archTodo, buildRoute: archTodo, buyBusiness: archTodo, setManager: archTodo, repairBusiness: archTodo,
+  setArchInsurance: archTodo, archSeen: archTodo,
 };
 
 export function applyPlayerAction(input: WorldState, action: PlayerAction): ActionResult {

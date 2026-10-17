@@ -820,6 +820,12 @@ describe('случайные действия: инварианты', () => {
       case 'setExtraShift': return { type, playerId: 'p1', on: rng.chance(0.5) };
       case 'endWeek': return { type };
       case 'resolveChoice': return { type, playerId: 'p1', accept: rng.chance(0.5) };
+      case 'buildRoute': return { type, playerId: 'p1', island: 'cedar' };
+      case 'buyBusiness': return { type, playerId: 'p1', business: 'coldStore', loan: 0 };
+      case 'setManager': return { type, playerId: 'p1', business: 'coldStore', manager: 'hired' };
+      case 'repairBusiness': return { type, playerId: 'p1', business: 'coldStore' };
+      case 'setArchInsurance': return { type, playerId: 'p1', on: rng.chance(0.5) };
+      case 'archSeen': return { type, playerId: 'p1', what: 'intro' };
       default: return { type, playerId: 'p1' };
     }
   }

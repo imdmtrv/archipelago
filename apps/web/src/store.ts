@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   applyAction, assetViews, choiceView, createWorld, financeView, getPlayer, migrateWorld, ASSET_DEFS, DREAMS, DREAM_UPKEEP_UID,
-  type Action, type GameEvent, type ProfessionId, type WeekNewsItem, type WeekReport, type WorldState,
+  type Action, type GameEvent, type IslandId, type ProfessionId, type WeekNewsItem, type WeekReport, type WorldState,
 } from '@arch/engine';
 import type { DreamProgress, FloatLabel, PlacedItem, Weather } from './scene/contract';
 import { onAction, onWeek, onWeather, startGameSounds, stopGameSounds } from './audio/gameSounds';
@@ -92,6 +92,10 @@ interface GameStore {
   choiceOpen: boolean;
   tab: Tab;
   sheetOpen: boolean;
+  /** Режим «Архипелаг»: камера наверху, панель/шторка показывает острова. Не сохраняется — до перезагрузки. */
+  archMode: boolean;
+  /** Остров, к которому подлетела камера и чья карточка раскрыта; null — общий вид архипелага. */
+  archFocus: IslandId | null;
   highlightUid: string | null;
   busy: boolean;
 
@@ -103,6 +107,10 @@ interface GameStore {
   closeChoice(): void;
   setTab(tab: Tab): void;
   setSheetOpen(open: boolean): void;
+  /** Включить/выключить режим; выключение сбрасывает archFocus. */
+  setArchMode(on: boolean): void;
+  /** Подлететь к острову (включает режим) или вернуться к общему виду (null). */
+  setArchFocus(island: IslandId | null): void;
   focusItem(uid: string): void;
   showNeighbor(playerId: string | null): void;
   showToast(text: string, tone?: Toast['tone']): void;
@@ -148,6 +156,8 @@ export const useGame = create<GameStore>((set, get) => {
     choiceOpen: false,
     tab: 'deals',
     sheetOpen: false,
+    archMode: false,
+    archFocus: null,
     highlightUid: null,
     busy: false,
 
@@ -156,7 +166,7 @@ export const useGame = create<GameStore>((set, get) => {
       if (get().world) stopGameSounds();
       const world = createWorld({ seed: seed ?? Math.floor(Math.random() * 2 ** 31), playerName, islandName, profession: challenge?.profession ?? profession });
       const history = recordHistory({}, world);
-      set({ world, news: [], history, moments: [], boughtDefIds: [], challenge, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, tab: 'deals', sheetOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
+      set({ world, news: [], history, moments: [], boughtDefIds: [], challenge, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, tab: 'deals', sheetOpen: false, archMode: false, archFocus: null, floats: [], weather: 'clear', busy: false, toast: null });
       save({ world, news: [], history, moments: [], boughtDefIds: [], challenge });
       startGameSounds(world);
     },
@@ -165,7 +175,7 @@ export const useGame = create<GameStore>((set, get) => {
       clearTimers();
       stopGameSounds();
       save(null);
-      set({ world: null, news: [], history: {}, moments: [], boughtDefIds: [], challenge: null, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
+      set({ world: null, news: [], history: {}, moments: [], boughtDefIds: [], challenge: null, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, archMode: false, archFocus: null, floats: [], weather: 'clear', busy: false, toast: null });
     },
 
     act(action, success) {
@@ -324,6 +334,8 @@ export const useGame = create<GameStore>((set, get) => {
     closeChoice() { choicePromptSeq++; set({ choiceOpen: false }); },
     setTab(tab) { set({ tab, sheetOpen: true }); },
     setSheetOpen(open) { set({ sheetOpen: open }); },
+    setArchMode(on) { set(on ? { archMode: true } : { archMode: false, archFocus: null }); },
+    setArchFocus(island) { set(island ? { archMode: true, archFocus: island } : { archFocus: null }); },
 
     focusItem(uid) {
       if (uid === 'dream') {

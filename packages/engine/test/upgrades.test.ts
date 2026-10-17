@@ -242,7 +242,7 @@ describe('после улучшения', () => {
     giveAsset(world, 'p1', 'boat', { level: 3 });
     const report: PlayerWeekReport = {
       playerId: 'p1', salary: 0, assetIncome: [], upkeep: [], living: 0, interest: 0, insurance: 0,
-      eventsCash: 0, net: 0, cashAfter: 0, happinessDelta: 0, events: [], lostAssetUids: [], freedomReached: false,
+      eventsCash: 0, net: 0, cashAfter: 0, happinessDelta: 0, events: [], lostAssetUids: [], freedomReached: false, arch: null,
     };
     rollWorldEvent(world, new ZeroRng(0), { p1: report });
     expect(report.events[0].id).toBe('stormDamage');

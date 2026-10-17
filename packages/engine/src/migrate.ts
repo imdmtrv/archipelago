@@ -124,7 +124,7 @@ function isWorldBase(raw: unknown): raw is Obj & { players: unknown[] } {
 export function migrateWorld(raw: unknown): WorldState | null {
   if (!isWorldBase(raw)) return null;
   const version = raw.version;
-  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6 && version !== 7 && version !== 8) return null;
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6 && version !== 7 && version !== 8 && version !== 9) return null;
 
   let world: Obj;
   try {
@@ -155,6 +155,7 @@ export function migrateWorld(raw: unknown): WorldState | null {
     if (version < 8) v7ToV8(world);
     else if (!(players as Obj[]).every((p) => isObj(p.noAskUntil)
       && Object.values(p.noAskUntil).every((week) => isNum(week) && Number.isInteger(week) && week >= 0))) return null;
+    if (version < 9) v8ToV9(world);
     return world as unknown as WorldState;
   }
 
@@ -175,6 +176,7 @@ export function migrateWorld(raw: unknown): WorldState | null {
   world.upcoming = [];
   v6ToV7(world);
   v7ToV8(world);
+  v8ToV9(world);
   return world as unknown as WorldState;
 }
 
@@ -182,6 +184,12 @@ export function migrateWorld(raw: unknown): WorldState | null {
 function v7ToV8(world: Obj): void {
   for (const p of world.players as Obj[]) p.noAskUntil = {};
   world.version = 8;
+}
+
+/** 8 → 9: архипелага ещё нет. TODO(Codex 1): сохранение уже на 150% и выше — открыть при загрузке. */
+function v8ToV9(world: Obj): void {
+  world.archipelago = null;
+  world.version = 9;
 }
 
 /** 6 → 7: до профессий у всех были числа учителя — им и остаются; зарплата, расходы и деньги сохраняются. */

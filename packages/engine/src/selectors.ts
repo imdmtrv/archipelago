@@ -40,6 +40,7 @@ export function financeView(world: WorldState, playerId: string): FinanceView {
   return {
     salary,
     passiveIncome: passive,
+    arch: { income: 0, expenses: 0 }, // TODO(Codex 1)
     expenses,
     net: salary + passive - expenses.total,
     freedomRatio,

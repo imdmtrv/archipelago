@@ -6,6 +6,7 @@ export { choiceView, goalsView, insuranceActive, rumorViews } from './engagement
 export { EVENT_VARIANTS } from './events';
 export { createWorld } from './world';
 export { migrateWorld } from './migrate';
+export { archipelagoView, ARCH_MAP_ORDER } from './archipelago/view';
 export { applyAction } from './reducer';
 export {
   getPlayer,

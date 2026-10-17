@@ -34,6 +34,8 @@ export function ChoiceModal() {
   }, [uid, close]);
 
   if (!world || !view) return null;
+  // TODO(Codex 2): окна развилок архипелага — partner, bankLoan, bizBuyer (archipelago-screen.md, «Развилки»).
+  if (view.kind === 'partner' || view.kind === 'bankLoan' || view.kind === 'bizBuyer') return null;
   const copy = t.ui.choices;
   let title: string, text: string, hint: string, accept: string, decline: string, success: string;
   let details;
