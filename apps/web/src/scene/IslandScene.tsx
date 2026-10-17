@@ -18,6 +18,7 @@ import { FloatLabels } from './FloatLabels';
 import { CameraRig, type CameraFocus } from './CameraRig';
 import { DirectorCamera } from './DirectorCamera';
 import { dreamFocusPoint } from './slots';
+import { Archipelago } from './Archipelago';
 import './scene.css';
 import { registerIslandCapture } from './snapshot';
 
@@ -51,7 +52,7 @@ function SnapshotCapture() {
   return null;
 }
 
-export function IslandScene({ items, floats, weather, dream, bottomInset = 0, sideInsets, cameraPose, dpr, onItemClick }: IslandSceneProps) {
+export function IslandScene({ items, floats, weather, dream, bottomInset = 0, sideInsets, cameraPose, dpr, onItemClick, arch }: IslandSceneProps) {
   const storm = weather === 'storm';
   // шина создаётся один раз; погода стартует сразу в нужном состоянии
   const bus = useMemo(() => createBus(weather === 'storm'), []);
@@ -81,26 +82,27 @@ export function IslandScene({ items, floats, weather, dream, bottomInset = 0, si
 
   return (
     <div
-      className={storm ? 'isl-root isl-storm' : 'isl-root'}
+      className={`isl-root${storm ? ' isl-storm' : ''}${arch?.on ? ' isl-arch' : ''}`}
       style={{ '--isl-inset': Math.min(0.6, Math.max(0, bottomInset || 0)) } as CSSProperties}
     >
       <Canvas shadows="percentage" dpr={dpr ?? [1, 2]} gl={GL} camera={camera}>
         <SnapshotCapture />
         <BusContext.Provider value={bus}>
-          <Atmosphere />
-          <Water segments={small ? 170 : 230} />
+          <Atmosphere archOn={!!arch?.on} />
+          <Water segments={small ? 170 : 230} wide={!!arch?.on} />
           <Terrain />
           <Decor />
           <Lighthouse />
           <Home />
-          <Neighbors />
+          <Neighbors arch={arch} />
+          {arch?.on && <Archipelago arch={arch} />}
           <Clouds />
           <Gulls />
           <Rain count={small ? 600 : 900} />
           <Items items={items} clickRef={clickRef} />
           {dream && <Shipyard dream={dream} clickRef={clickRef} />}
           <FloatLabels floats={floats} items={items} />
-          {cameraPose ? <DirectorCamera pose={cameraPose} /> : <CameraRig bottomInset={bottomInset} sideInsets={sideInsets} focus={focus} />}
+          {cameraPose ? <DirectorCamera pose={cameraPose} /> : <CameraRig bottomInset={bottomInset} sideInsets={sideInsets} focus={focus} arch={arch} />}
         </BusContext.Provider>
       </Canvas>
       <div className="isl-tilt isl-tilt-top" />
