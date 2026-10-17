@@ -42,3 +42,12 @@ export const BUSINESSES: Record<BusinessId, BusinessDef> = {
     sector: 'stable', stormRisk: 0, resaleRate: 0.8,
   },
 };
+
+/**
+ * Наборы «как улицы одного цвета»: три дела, которые вместе приносят больше. Верфь — в обоих:
+ * она строит лодки для рыбной связки и паромы, которые везут гостей курорта.
+ */
+export const SETS: Record<'fishing' | 'resort', BusinessId[]> = {
+  fishing: ['cannery', 'coldStore', 'shipyard'],  // рыбная связка
+  resort: ['hotel', 'shipyard', 'bank'],          // курорт
+};

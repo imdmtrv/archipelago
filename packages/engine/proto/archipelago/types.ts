@@ -107,6 +107,8 @@ export interface ArchState {
   /** Страховка дел человека от штормов: с какой недели действует (оформление + INSURANCE_WAIT_WEEKS движка); null — нет. */
   insuredFrom: number | null;
   choice: ArchChoice | null; // одна развилка за раз, решается на следующей неделе (нерешённая = отказ)
+  /** С какой недели компания с материка достраивает архипелаг (итерация 2); null — ещё не начала. */
+  mainlandFrom: number | null;
   finaleWeek: number | null; // «Архипелаг процветает»: все острова связаны и на каждом работает дело
   rng: number;               // своё состояние ГПСЧ: состояние движка (world.rng) слой не трогает
   nextUid: number;
