@@ -10,6 +10,7 @@
   "scripts": {
     "test": "vitest run",
     "sim": "tsx scripts/simulate.ts",
+    "sim:arch": "tsx scripts/archipelago.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
