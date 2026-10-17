@@ -1,3 +1,7 @@
+import { humanBusinessCount, humanShare, grossIncome, managerFee } from './archipelago/model';
+import { BUSINESSES } from './archipelago/content';
+import * as AR from './archipelago/rules';
+import { financeView } from './selectors';
 // Развилки, цели и слухи — чистые производные данные для UI.
 import { buyerAsset } from './choices';
 import { GOALS } from './content';
@@ -12,8 +16,9 @@ export function choiceView(world: WorldState, playerId: string): ChoiceView | nu
   const choice = player?.choice;
   if (!player || !choice) return null;
   const ratio = (p: PlayerState) => {
-    const expenses = weeklyExpenses(p).total;
-    return expenses > 0 ? passiveIncome(p, world.market) / expenses : 0;
+    const preview = { ...world, players: world.players.map((x) => x.id === p.id ? p : x) };
+    const expenses = weeklyExpenses(p, preview).total;
+    return expenses > 0 ? passiveIncome(p, world.market, preview) / expenses : 0;
   };
   if (choice.kind === 'neighborLoan') {
     const amount = Number(choice.params.amount);
@@ -38,6 +43,45 @@ export function choiceView(world: WorldState, playerId: string): ChoiceView | nu
       freedomBefore: ratio(player), freedomAfter: ratio({ ...player, owned: [...player.owned, { ...asset, price }] }),
       canAccept: reason === null, ...(reason ? { reason } : {}) };
   }
+  if (choice.kind === 'partner') {
+    const a = world.archipelago;
+    if (!a) return null;
+    const d = BUSINESSES[choice.params.business as keyof typeof BUSINESSES];
+    const half = d.price * AR.PARTNER_SHARE;
+    const used = humanBusinessCount(a);
+    const bot = world.players.find((p) => p.id === choice.params.botId);
+    if (!bot) return null;
+    const reason = a.businesses.some((b) => b.id === d.id) ? { code: 'businessTaken' as const }
+      : used >= AR.MAX_HUMAN_BUSINESSES ? { code: 'businessLimit' as const }
+      : player.cash < half ? { code: 'notEnoughCash' as const, missing: half - player.cash }
+      : bot.cash < d.price - half ? { code: 'notEnoughCash' as const, missing: d.price - half - bot.cash } : undefined;
+    return { kind: 'partner', uid: choice.uid, botId: String(choice.params.botId), business: d.id, half,
+      expiresWeek: choice.expiresWeek ?? choice.week, deferred: choice.deferred ?? false,
+      slot: { used, max: AR.MAX_HUMAN_BUSINESSES }, canAccept: !reason, ...(reason ? { reason } : {}) };
+  }
+  if (choice.kind === 'bankLoan') {
+    const amount = Number(choice.params.amount), weeklyRate = Number(choice.params.weeklyRate);
+    const cls = choice.params.cls as 'reliable' | 'normal' | 'risky';
+    const reason = player.cash < amount ? { code: 'notEnoughCash' as const, missing: amount - player.cash } : undefined;
+    return { kind: 'bankLoan', uid: choice.uid, borrower: String(choice.params.borrower), cls, amount, weeklyRate,
+      term: Number(choice.params.term), weeklyInterest: Math.round(amount * weeklyRate), defaultChance: AR.BANK_DEFAULT[cls],
+      crisisRumor: rumorViews(world, playerId).find((r) => r.kind === 'crisis' && r.source === 'reliable') ?? null,
+      canAccept: !reason, ...(reason ? { reason } : {}) };
+  }
+  if (choice.kind === 'bizBuyer') {
+    const a = world.archipelago, b = a?.businesses.find((b) => b.id === choice.params.business && humanShare(b) === 1);
+    if (!a || !b) return null;
+    const gross = grossIncome(world, a, b), def = BUSINESSES[b.id];
+    const weeklyIncome = gross - managerFee(gross, b.manager) - def.upkeep
+      - (a.insuredFrom !== null && def.stormRisk > 0 ? Math.round(AR.BUSINESS_INSURANCE_RATE * def.price) : 0);
+    const offer = Number(choice.params.offer);
+    const preview = { ...world, archipelago: { ...a, businesses: a.businesses.map((x) => x === b
+      ? { ...x, stakes: [{ playerId: 'mainland', share: 1 }], manager: 'partner' as const } : x) } };
+    return { kind: 'bizBuyer', uid: choice.uid, business: b.id, offer, weeklyIncome,
+      weeksOfIncome: weeklyIncome > 0 ? Math.round(offer / weeklyIncome) : null,
+      freedomBefore: ratio(player), freedomAfter: financeView(preview, playerId).freedomRatio };
+  }
+  if (choice.kind !== 'buyer') return null;
   const asset = buyerAsset(player, choice.params.assetUid);
   if (!asset) return null;
   return { kind: choice.kind, uid: choice.uid, assetUid: asset.uid, defId: asset.defId, level: asset.level,

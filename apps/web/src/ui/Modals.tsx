@@ -10,6 +10,7 @@ import { Emblem } from './TopBar';
 import { ShareButton } from './ShareButton';
 import type { ChallengeData } from '../challenge';
 import { track } from '../analytics';
+import { ArchReport } from './arch/ArchReport';
 
 export function WelcomeModal({ challenge = null, onDismiss }: { challenge?: ChallengeData | null; onDismiss?: () => void }) {
   const { t, lang, setLang } = useI18n();
@@ -117,8 +118,11 @@ function FreedomChoice({ onStay, onQuit }: { onStay: () => void; onQuit: () => v
 function WeekSummary({ modal }: { modal: WeekModalData }) {
   const { t } = useI18n();
   const mine = modal.report.players[HUMAN];
-  const income = mine.salary + mine.assetIncome.reduce((s, a) => s + a.amount, 0);
-  const expenses = mine.living + mine.upkeep.reduce((s, a) => s + a.amount, 0) + mine.interest + mine.insurance;
+  const arch = mine.arch;
+  const income = mine.salary + mine.assetIncome.reduce((s, a) => s + a.amount, 0)
+    + (arch ? arch.businesses + Math.max(0, arch.routes) + arch.bankInterest : 0);
+  const expenses = mine.living + mine.upkeep.reduce((s, a) => s + a.amount, 0) + mine.interest + mine.insurance
+    + (arch ? arch.managers + Math.max(0, -arch.routes) + arch.bankLost + arch.upkeep + arch.insurance + arch.repairs : 0);
   return (
     <div className="week-sum">
       <div><span>{t.ui.weekModal.income}</span><b className="pos">+{fmt(income)}</b></div>
@@ -191,6 +195,7 @@ export function WeekModal() {
         </div>
 
         <WeekSummary modal={modal} />
+        <ArchReport lines={modal.report.players[HUMAN].arch} />
         {modal.freedom
           ? <FreedomChoice onStay={close} onQuit={quit} />
           : <button className="btn primary big" onClick={close} ref={focusOnMount}>{t.ui.weekModal.next}</button>}

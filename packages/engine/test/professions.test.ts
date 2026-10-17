@@ -149,7 +149,7 @@ describe('миграция v6 → v8', () => {
     }
     const before = structuredClone(raw);
     const migrated = migrateWorld(raw)!;
-    expect(migrated.version).toBe(8);
+    expect(migrated.version).toBe(9);
     expect(migrated.players.map((p) => p.profession)).toEqual(['teacher', 'teacher', 'teacher', 'teacher']);
     for (const [i, p] of migrated.players.entries()) {
       expect(p).toMatchObject({ salary: raw.players[i].salary, living: raw.players[i].living,

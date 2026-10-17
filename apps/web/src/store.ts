@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
-  applyAction, assetViews, choiceView, createWorld, financeView, getPlayer, migrateWorld, ASSET_DEFS, DREAMS, DREAM_UPKEEP_UID,
-  type Action, type GameEvent, type ProfessionId, type WeekNewsItem, type WeekReport, type WorldState,
+  applyAction, archipelagoView, assetViews, choiceView, createWorld, financeView, getPlayer, migrateWorld, ASSET_DEFS, DREAMS, DREAM_UPKEEP_UID,
+  type Action, type GameEvent, type IslandId, type ProfessionId, type WeekNewsItem, type WeekReport, type WorldState,
 } from '@arch/engine';
 import type { DreamProgress, FloatLabel, PlacedItem, Weather } from './scene/contract';
 import { onAction, onWeek, onWeather, startGameSounds, stopGameSounds } from './audio/gameSounds';
@@ -92,6 +92,11 @@ interface GameStore {
   choiceOpen: boolean;
   tab: Tab;
   sheetOpen: boolean;
+  /** Режим «Архипелаг»: камера наверху, панель/шторка показывает острова. Не сохраняется — до перезагрузки. */
+  archMode: boolean;
+  /** Остров, к которому подлетела камера и чья карточка раскрыта; null — общий вид архипелага. */
+  archFocus: IslandId | null;
+  archNotice: 'intro' | 'finale' | null;
   highlightUid: string | null;
   busy: boolean;
 
@@ -101,8 +106,14 @@ interface GameStore {
   endWeek(): void;
   closeModal(): void;
   closeChoice(): void;
+  openChoice(): void;
+  closeArchNotice(): void;
   setTab(tab: Tab): void;
   setSheetOpen(open: boolean): void;
+  /** Включить/выключить режим; выключение сбрасывает archFocus. */
+  setArchMode(on: boolean): void;
+  /** Подлететь к острову (включает режим) или вернуться к общему виду (null). */
+  setArchFocus(island: IslandId | null): void;
   focusItem(uid: string): void;
   showNeighbor(playerId: string | null): void;
   showToast(text: string, tone?: Toast['tone']): void;
@@ -112,6 +123,16 @@ const saved = load();
 if (saved) save(saved); // старое сохранение переписываем в текущей версии — ключ тот же
 let toastSeq = 0;
 let floatSeq = 0;
+
+function archNotice(world: WorldState | null): 'intro' | 'finale' | null {
+  const view = world && archipelagoView(world, HUMAN);
+  return !view ? null : !view.seen.intro ? 'intro' : view.finaleWeek !== null && !view.seen.finale ? 'finale' : null;
+}
+
+function shouldPromptChoice(world: WorldState): boolean {
+  const choice = choiceView(world, HUMAN);
+  return !!choice && !(choice.kind === 'partner' && choice.deferred);
+}
 
 export const useGame = create<GameStore>((set, get) => {
   const timers = new Set<ReturnType<typeof setTimeout>>();
@@ -148,6 +169,9 @@ export const useGame = create<GameStore>((set, get) => {
     choiceOpen: false,
     tab: 'deals',
     sheetOpen: false,
+    archMode: false,
+    archFocus: null,
+    archNotice: archNotice(saved?.world ?? null),
     highlightUid: null,
     busy: false,
 
@@ -156,7 +180,7 @@ export const useGame = create<GameStore>((set, get) => {
       if (get().world) stopGameSounds();
       const world = createWorld({ seed: seed ?? Math.floor(Math.random() * 2 ** 31), playerName, islandName, profession: challenge?.profession ?? profession });
       const history = recordHistory({}, world);
-      set({ world, news: [], history, moments: [], boughtDefIds: [], challenge, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, tab: 'deals', sheetOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
+      set({ world, news: [], history, moments: [], boughtDefIds: [], challenge, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, tab: 'deals', sheetOpen: false, archMode: false, archFocus: null, archNotice: null, floats: [], weather: 'clear', busy: false, toast: null });
       save({ world, news: [], history, moments: [], boughtDefIds: [], challenge });
       startGameSounds(world);
     },
@@ -165,7 +189,7 @@ export const useGame = create<GameStore>((set, get) => {
       clearTimers();
       stopGameSounds();
       save(null);
-      set({ world: null, news: [], history: {}, moments: [], boughtDefIds: [], challenge: null, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, floats: [], weather: 'clear', busy: false, toast: null });
+      set({ world: null, news: [], history: {}, moments: [], boughtDefIds: [], challenge: null, shareFallback: null, neighborId: null, modal: null, choiceOpen: false, archMode: false, archFocus: null, archNotice: null, floats: [], weather: 'clear', busy: false, toast: null });
     },
 
     act(action, success) {
@@ -175,7 +199,7 @@ export const useGame = create<GameStore>((set, get) => {
       if (res.error) {
         // Движок может снять устаревшую развилку даже при ошибке (актив уже продан).
         if (action.type === 'resolveChoice') {
-          set({ world: res.world, choiceOpen: !!choiceView(res.world, HUMAN) });
+          set({ world: res.world, choiceOpen: shouldPromptChoice(res.world) });
           save({ world: res.world, news: get().news, history: get().history, moments: get().moments, boughtDefIds: get().boughtDefIds, challenge: get().challenge });
         }
         onAction(action, world, res.world, res.error);
@@ -197,7 +221,8 @@ export const useGame = create<GameStore>((set, get) => {
           if (asset) moments.push({ week: world.week, kind: 'upgraded', defId: asset.defId, level: asset.level });
         }
       }
-      set({ world: res.world, moments: moments.slice(-20), boughtDefIds, ...(action.type === 'resolveChoice' ? { choiceOpen: false } : {}) });
+      set({ world: res.world, moments: moments.slice(-20), boughtDefIds,
+        ...(['resolveChoice', 'deferChoice'].includes(action.type) ? { choiceOpen: false } : {}) });
       save({ world: res.world, news: get().news, history: get().history, moments: get().moments, boughtDefIds, challenge: get().challenge });
       onAction(action, world, res.world);
 
@@ -233,9 +258,9 @@ export const useGame = create<GameStore>((set, get) => {
     },
 
     endWeek() {
-      const { world, busy, modal } = get();
-      if (!world || busy || modal) return;
-      if (choiceView(world, HUMAN)) {
+      const { world, busy, modal, archNotice: notice } = get();
+      if (!world || busy || modal || notice) return;
+      if (shouldPromptChoice(world)) {
         choicePromptSeq++;
         set({ choiceOpen: true, neighborId: null });
         get().showToast(getI18n().t.ui.choices.pending);
@@ -265,7 +290,7 @@ export const useGame = create<GameStore>((set, get) => {
         ...get().news,
       ].slice(0, 80);
       const history = recordHistory(get().history, res.world);
-      set({ world: res.world, news, history, moments: moments.slice(-20), busy: true });
+      set({ world: res.world, news, history, moments: moments.slice(-20), busy: true, archNotice: archNotice(res.world) });
       save({ world: res.world, news, history, moments: get().moments, boughtDefIds: get().boughtDefIds, challenge });
 
       // Деньги «текут» на острове: зарплата над домом, доход над каждым активом
@@ -307,7 +332,7 @@ export const useGame = create<GameStore>((set, get) => {
           const prompt = ++choicePromptSeq;
           if (uid) schedule(() => {
             const latest = get();
-            if (prompt === choicePromptSeq && latest.world?.week === res.world.week && choiceView(latest.world, HUMAN)?.uid === uid && !latest.modal && !latest.busy) {
+            if (prompt === choicePromptSeq && latest.world?.week === res.world.week && choiceView(latest.world, HUMAN)?.uid === uid && shouldPromptChoice(latest.world) && !latest.modal && !latest.busy && !latest.archNotice) {
               set({ choiceOpen: true, neighborId: null });
             }
           }, 3200);
@@ -318,12 +343,29 @@ export const useGame = create<GameStore>((set, get) => {
     closeModal() {
       choicePromptSeq++;
       const { world } = get();
-      const choiceOpen = !!world && !!choiceView(world, HUMAN);
-      set({ modal: null, choiceOpen, ...(choiceOpen ? { neighborId: null } : {}) });
+      const notice = archNotice(world);
+      const choiceOpen = !notice && !!world && shouldPromptChoice(world);
+      set({ modal: null, archNotice: notice, choiceOpen, ...(choiceOpen || notice ? { neighborId: null } : {}) });
     },
     closeChoice() { choicePromptSeq++; set({ choiceOpen: false }); },
+    openChoice() { choicePromptSeq++; if (get().world && choiceView(get().world!, HUMAN)) set({ choiceOpen: true, neighborId: null }); },
+    closeArchNotice() {
+      const notice = get().archNotice;
+      if (!notice || !get().act({ type: 'archSeen', playerId: HUMAN, what: notice })) return;
+      const world = get().world!;
+      const nextNotice = archNotice(world);
+      set({ archNotice: nextNotice, choiceOpen: !nextNotice && shouldPromptChoice(world) });
+    },
     setTab(tab) { set({ tab, sheetOpen: true }); },
     setSheetOpen(open) { set({ sheetOpen: open }); },
+    setArchMode(on) {
+      if (on && (!get().world || !archipelagoView(get().world!, HUMAN))) return;
+      set(on ? { archMode: true, sheetOpen: true } : { archMode: false, archFocus: null });
+    },
+    setArchFocus(island) {
+      if (island && (!get().world || !archipelagoView(get().world!, HUMAN))) return;
+      set(island ? { archMode: true, archFocus: island, sheetOpen: true } : { archFocus: null });
+    },
 
     focusItem(uid) {
       if (uid === 'dream') {

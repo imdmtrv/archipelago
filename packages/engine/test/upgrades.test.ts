@@ -242,7 +242,7 @@ describe('после улучшения', () => {
     giveAsset(world, 'p1', 'boat', { level: 3 });
     const report: PlayerWeekReport = {
       playerId: 'p1', salary: 0, assetIncome: [], upkeep: [], living: 0, interest: 0, insurance: 0,
-      eventsCash: 0, net: 0, cashAfter: 0, happinessDelta: 0, events: [], lostAssetUids: [], freedomReached: false,
+      eventsCash: 0, net: 0, cashAfter: 0, happinessDelta: 0, events: [], lostAssetUids: [], freedomReached: false, arch: null,
     };
     rollWorldEvent(world, new ZeroRng(0), { p1: report });
     expect(report.events[0].id).toBe('stormDamage');
@@ -503,7 +503,7 @@ describe('миграция: версия 3', () => {
     const snapshot = JSON.stringify(raw);
     const world = migrateWorld(raw)!;
     expect(world).not.toBeNull();
-    expect(world.version).toBe(8);
+    expect(world.version).toBe(9);
     expect(JSON.stringify(raw)).toBe(snapshot);
     const owned = world.players.flatMap((p) => p.owned);
     expect(owned).toHaveLength(ownedOf(raw).length);
@@ -532,7 +532,7 @@ describe('миграция: версия 3', () => {
     }
     const world = migrateWorld(raw)!;
     expect(world).not.toBeNull();
-    expect(world.version).toBe(8);
+    expect(world.version).toBe(9);
     expect(world.players[0].dream).toMatchObject({ id: 'schooner', built: 0 });
     expect(world.players.flatMap((p) => p.owned).every((a) => a.level === 1)).toBe(true);
     expect(JSON.stringify(ok(migrateWorld(raw)!, { type: 'endWeek' }))).toBe(JSON.stringify(ok(world, { type: 'endWeek' })));

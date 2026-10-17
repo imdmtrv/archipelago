@@ -1,3 +1,4 @@
+import { archProjection } from './archipelago/model';
 // Производные данные для UI. Только чтение мира.
 import { upgradeError } from './actions';
 import { isScamVisible } from './content';
@@ -23,9 +24,10 @@ export function getPlayer(world: WorldState, playerId: string): PlayerState {
 }
 
 /** Доля свободы, как её показывает шкала: пассивный доход (как его видит игрок) / расходы. */
-function shownFreedomRatio(player: PlayerState, market: MarketState): number {
-  const total = weeklyExpenses(player).total;
-  return total > 0 ? passiveIncome(player, market) / total : 0;
+function shownFreedomRatio(player: PlayerState, market: MarketState, world: WorldState): number {
+  const preview = { ...world, players: world.players.map((p) => p.id === player.id ? player : p) };
+  const total = weeklyExpenses(player, preview).total;
+  return total > 0 ? passiveIncome(player, market, preview) / total : 0;
 }
 
 export function financeView(world: WorldState, playerId: string): FinanceView {
@@ -33,17 +35,18 @@ export function financeView(world: WorldState, playerId: string): FinanceView {
   const salary = player.employed && player.layoffWeeks === 0
     ? Math.round(player.salary * (player.extraShift ? 1 + R.EXTRA_SHIFT_BONUS : 1))
     : 0;
-  const passive = passiveIncome(player, world.market);
-  const expenses = weeklyExpenses(player);
+  const passive = passiveIncome(player, world.market, world);
+  const expenses = weeklyExpenses(player, world);
   const debt = totalDebt(player);
   const freedomRatio = expenses.total > 0 ? passive / expenses.total : 0;
   return {
     salary,
     passiveIncome: passive,
+    arch: { income: archProjection(world, player).income, expenses: archProjection(world, player).expenses },
     expenses,
     net: salary + passive - expenses.total,
     freedomRatio,
-    netWorth: player.cash + assetsValue(player, world.market) - debt,
+    netWorth: player.cash + assetsValue(player, world.market, world) - debt,
     debt,
     employed: player.employed,
     level: freedomLevel(freedomRatio),
@@ -70,7 +73,7 @@ function freedomAfterBuying(world: WorldState, player: PlayerState, offer: Offer
       slotIndex: 0,
     }],
   };
-  return shownFreedomRatio(preview, world.market);
+  return shownFreedomRatio(preview, world.market, world);
 }
 
 /**
@@ -82,7 +85,7 @@ function freedomAfterUpgrade(world: WorldState, player: PlayerState, asset: Owne
     ...player,
     owned: player.owned.map((a) => (a.uid === asset.uid ? { ...upgradedAsset(a, up), damaged: false } : a)),
   };
-  return shownFreedomRatio(preview, world.market);
+  return shownFreedomRatio(preview, world.market, world);
 }
 
 /** Следующее улучшение актива; null — улучшать нечего. */
@@ -184,7 +187,7 @@ export function dreamView(world: WorldState, playerId: string): DreamView | null
     workPerWeek,
     weeksLeft,
     canStart: reason === undefined && missingCash === undefined,
-    freedomAfterDone: shownFreedomRatio(finished, world.market),
+    freedomAfterDone: shownFreedomRatio(finished, world.market, world),
   };
   if (reason !== undefined) view.reason = reason;
   if (missingCash !== undefined) view.missingCash = missingCash;

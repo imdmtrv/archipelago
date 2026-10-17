@@ -142,7 +142,7 @@ export const dreamSavings = (me: PlayerState): number => {
 function dreamer(quitRatio: number | null): Policy {
   const base = makeSensible({ beforeBuying: startDreamStage, upgradeReserve: dreamSavings });
   return (world, me) => {
-    if (quitRatio !== null && me.employed && me.freedomWeek !== null && realFreedomRatio(me, world.market) >= quitRatio) {
+    if (quitRatio !== null && me.employed && me.freedomWeek !== null && realFreedomRatio(me, world.market, world) >= quitRatio) {
       return { type: 'quitJob', playerId: me.id };
     }
     return base(world, me);

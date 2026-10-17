@@ -236,6 +236,16 @@ export const en: Dict = {
     dreamBusy: 'This stage is still being built',
     dreamDone: 'Your dream is already complete',
     noChoice: 'There is nothing to decide right now',
+    archClosed: 'The archipelago opens at 150%',
+    cannotDefer: 'This decision can’t wait',
+    routeBuilt: 'The ferry already runs',
+    noRoute: 'Run a ferry there first',
+    businessTaken: 'This business is already built',
+    businessLimit: 'You already have 3 of 3 businesses',
+    notOwner: 'This business isn’t yours',
+    noDays: 'No free days',
+    managerBusy: 'Already managing another business',
+    loanTooBig: 'Credit covers at most half the price',
     notEnoughCash: (_n, coins) => `You need ${coins} more`,
     needKnowledge: (n) => `Knowledge ${n} needed`,
     loanOverLimit: (_n, coins) => `The bank will lend at most ${coins}`,
@@ -414,6 +424,202 @@ export const en: Dict = {
     layoffOver: {
       title: 'Job found',
       text: 'A new job was found — salary arrives every week again.',
+    },
+  },
+  
+  // Archipelago: the second part of the game after 150%. Spec: docs/specs/archipelago-screen.md, "Texts".
+  arch: {
+    toggle: { arch: '🗺 Archipelago', home: '🏝 My island', attention: 'Decisions to make in the archipelago' },
+    /** Promise string in “To financial freedom” and tooltip on the toggle lock. */
+    promise: (now: number) => `The archipelago opens at 150% — currently ${now}%`,
+    back: '← Whole archipelago',
+    intro: {
+      title: 'The archipelago is open',
+      text: 'You have reached 150% — “Confidence”. Neighboring islands are calling on a grand scale: run a ferry, build a cannery, hotel, or bank. You can own three out of five businesses — choose which ones. Three businesses from the same set bring in more.',
+      button: 'View the archipelago',
+    },
+    firstRouteHint: 'A ferry connects an island to yours. Without a ferry, you cannot build a business on that island.',
+    head: {
+      businesses: 'Businesses',
+      days: 'Days',
+      income: 'Archipelago',
+      of: (a: number, b: number) => `${a} of ${b}`,
+      perWeek: (coins: string) => `${coins}/wk`,
+    },
+    islands: { lighthouse: 'Lighthouse', pelican: 'Pelican', shell: 'Seashell', cedar: 'Cedar', big: 'Big Island' },
+    /** Island in genitive case: “ferry to Pelican”. */
+    islandsGenitive: { lighthouse: 'Lighthouse', pelican: 'Pelican', shell: 'Seashell', cedar: 'Cedar', big: 'Big Island' },
+    businesses: {
+      cannery: {
+        title: 'Cannery', accusative: 'a cannery', female: false, badge: 'Business · fish',
+        text: 'Buys catch from archipelago boats and turns it into canned fish.',
+        effect: 'Catch from everyone in the network sells for 20% more. The more boats in the network, the higher the cannery’s income.',
+        onYou: 'Your catch +20%',
+      },
+      hotel: {
+        title: 'Hotel', accusative: 'a hotel', female: false, badge: 'Business · tourism',
+        text: 'The highest income, but guests arrive in season, and downturns and storms hit the hardest.',
+        effect: 'More guests with each inhabited island in the network.',
+        onYou: '',
+      },
+      coldStore: {
+        title: 'Cold store', accusative: 'a cold store', female: false, badge: 'Business · protection',
+        text: 'Stores the catch while fish is cheap. Brings in little, but saves you in a bad year.',
+        effect: 'When fish prices fall, network catch sells at the usual price. With a cannery, the cannery never sits idle.',
+        onYou: 'Your catch never drops in price',
+      },
+      shipyard: {
+        title: 'Shipyard', accusative: 'a shipyard', female: true, badge: 'Business · repair',
+        text: 'Builds ferries and repairs boats after storms — earns when others struggle.',
+        effect: 'Ferries cost 40% less. Income from every route and from storm repairs.',
+        onYou: 'Ferries are 40% cheaper for you',
+      },
+      bank: {
+        title: 'Archipelago bank', accusative: 'an archipelago bank', female: false, badge: 'Business · money',
+        text: 'Visitors and neighbors ask for loans, and you decide who gets one.',
+        effect: 'Interest is payment for risk: a risky borrower pays more, but defaults more often.',
+        onYou: '',
+      },
+    },
+    sets: {
+      fishing: {
+        title: 'Fishing chain',
+        text: 'Fishing chain — cannery, cold store, and shipyard: if you own all three, each brings in 25% more.',
+      },
+      resort: {
+        title: 'Resort',
+        text: 'Resort — hotel, shipyard, and bank: ferries from the shipyard bring guests, and the bank serves them. All three are yours — +25% to each.',
+      },
+      progress: (title: string, have: number, total: number) => `${title} ${have}/${total}`,
+      badge: (title: string) => `Set: ${title}`,
+      active: '+25% to each',
+    },
+    /** One-word status — for labels above islands and collapsed rows. */
+    status: {
+      noRoute: 'no ferry', free: 'available', mine: 'yours', partner: 'co-owned', neighbor: "neighbor's",
+      mainland: 'mainland', damaged: 'damaged',
+    },
+    card: {
+      resident: (name: string) => `${name} lives here`,
+      uninhabited: 'Uninhabited island',
+      canBuild: (accusative: string) => `Can build here: ${accusative}`,
+      tickets: (coins: string) => `Tickets ≈ +${coins}/wk net`,
+      buildRoute: (coins: string) => `Run ferry — ${coins}`,
+      cells: { price: 'Price', income: 'Income', payback: 'Payback', upkeep: 'Upkeep', value: 'Value' },
+      never: 'never',
+      freedom: (before: number, after: number) => `Freedom: ${before}% → ${after}%`,
+      build: (coins: string) => `Build for ${coins}`,
+      buildLoan: (own: string, loan: string) => `Build: ${own} own + ${loan} on credit`,
+      missing: (coins: string) => `Need ${coins} more`,
+      limit: (max: number) => `You already have ${max} of ${max} businesses`,
+      limitHint: 'A slot will open up if you sell a business to a buyer',
+      limitText: 'You already have 3 of 3 businesses. Neighbors and a mainland company will build up the remaining islands — their canneries and cold stores work for you too.',
+      yours: 'Your business',
+      manager: 'Who manages',
+      managerOwner: (days: string) => `Self · ${days}`,
+      managerHired: (pct: number) => `Hired · ${pct}%`,
+      managerNeighbor: (name: string, pct: number) => `${name} · ${pct}%`,
+      repair: (coins: string) => `Repair for ${coins}`,
+      insuredRepair: 'Insured — repaired for free',
+      partnerWith: (name: string) => `You and ${name} — 50/50, managed by ${name}`,
+      /** “Mia’s Hotel”, “Mainland company’s cold store”. */
+      ownedBy: (title: string, whoseGenitive: string) => `${whoseGenitive}’s ${title}`,
+      mainlandGenitive: 'Mainland company',
+      partnerOffer: (name: string, week: number) => `${name} is waiting for an answer until week ${week}`,
+      partnerOpen: 'Respond',
+    },
+    insurance: {
+      title: 'Business insurance',
+      premium: (coins: string) => `${coins}/wk`,
+      waiting: (week: number) => `Takes effect from week ${week}`,
+      active: 'Active: storms will not damage your businesses',
+    },
+    choices: {
+      partner: {
+        title: (name: string) => `${name} offers a partnership`,
+        text: (name: string, _female: boolean, accusative: string) =>
+          `${name} saved up for ${accusative} and suggests building together: you pay half, split the income, and ${name} manages.`,
+        half: 'Your half',
+        slot: (n: number, max: number) =>
+          `Slot: ${['first', 'second', 'third', 'fourth'][n - 1] ?? n} of ${['one', 'two', 'three', 'four'][max - 1] ?? max}`,
+        accept: (coins: string) => `Partner up for ${coins}`,
+        later: (weeks: string) => `Let me think (${weeks} left)`,
+        decline: (female: boolean) => (female ? 'Let her build alone' : 'Let him build alone'),
+      },
+      bankLoan: {
+        npc: 'Visitor',
+        titleNpc: (coins: string) => `A visitor asks for ${coins}`,
+        titleNeighbor: (name: string, coins: string) => `${name} asks for ${coins}`,
+        cls: { reliable: 'reliable', normal: 'regular', risky: 'risky' },
+        terms: (pct: string, term: string, coins: string) => `${pct}% a week, ${term} — +${coins}/wk`,
+        risk: {
+          reliable: 'Reliable borrowers almost always repay their debt — about one in thirty fails to repay, more often during a downturn.',
+          normal: 'Regular borrowers fail to repay roughly one in eight loans, more often during a downturn.',
+          risky: 'Risky borrowers fail to repay roughly one in three loans, and more than half during a downturn.',
+        },
+        rumor: (when: string) => `A reliable rumor is circulating: downturn ${when}`,
+        accept: (coins: string) => `Lend ${coins}`,
+        decline: 'Decline',
+      },
+      bizBuyer: {
+        title: (accusative: string) => `A mainland company wants to buy ${accusative}`,
+        textNoIncome: (offer: string, title: string) => `Offers ${offer}. Currently the ${title.toLowerCase()} brings in no income. A slot will open up.`,
+        text: (offer: string, title: string, income: string, weeks: string) =>
+          `Offers ${offer}. Currently the ${title.toLowerCase()} brings in +${income}/wk — that’s ${weeks} of income. A slot will open up.`,
+        accept: (coins: string) => `Sell for ${coins}`,
+        decline: 'Keep it',
+      },
+    },
+    /** Weekly report lines and finance section. */
+    report: {
+      title: 'Archipelago',
+      included: 'Including',
+      businesses: 'Archipelago businesses',
+      managers: 'Managers',
+      routes: 'Ferries',
+      bankInterest: 'Bank interest',
+      bankLost: 'Defaulted loans',
+      upkeep: 'Business upkeep',
+      insurance: 'Business insurance',
+      repairs: 'Business repairs',
+    },
+    /** Archipelago weekly events (GameEvent.id → text). */
+    events: {
+      archStorm: {
+        title: (island: string) => `Storm near ${island}`,
+        text: (title: string, _female: boolean, coins: string) =>
+          `The ${title.toLowerCase()} is damaged and brings in no income until repaired. Repair — ${coins}.`,
+      },
+      archStormInsured: {
+        title: (island: string) => `Storm near ${island}`,
+        text: (title: string, _female: boolean) => `The ${title.toLowerCase()} was damaged, but business insurance covered repairs right away.`,
+      },
+      archLoanRepaid: {
+        title: 'Loan repaid',
+        text: (who: string, _female: boolean, coins: string) => `${who} repaid the loan to the archipelago bank: ${coins} with interest.`,
+      },
+      archLoanLost: {
+        title: 'Loan not repaid',
+        text: (who: string, _female: boolean, coins: string) => `${who} could not settle the debt: the bank will not get ${coins} back. Interest is payment for that very risk.`,
+      },
+      archNeighborBuilt: {
+        title: (name: string, title: string) => `${name}: ${title.toLowerCase()} opened`,
+        text: (name: string, _female: boolean, title: string) => `${name} built a ${title.toLowerCase()} on their island. Its effect works for the entire network.`,
+      },
+      archMainlandBuilt: {
+        title: (title: string) => `Mainland company: ${title.toLowerCase()}`,
+        text: (title: string, island: string) =>
+          `A new business opened on ${island} — the mainland company’s ${title.toLowerCase()}. Income goes to the mainland, but the effect works for the entire network.`,
+      },
+      archFinale: {
+        title: 'The archipelago is thriving',
+        text: 'All islands are connected by ferries, and a major business operates on each one.',
+      },
+    },
+    epilogue: {
+      legacy: 'Legacy',
+      legacyText: (free: number, coins: string) =>
+        `Neighbors who reached freedom: ${free} of 3. Alongside you, they earned ${coins}.`,
     },
   },
   ui: {

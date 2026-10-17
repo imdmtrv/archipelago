@@ -6,6 +6,8 @@ import { levelTitle, percent } from './text';
 import { displayPlayer, getI18n, useI18n } from '../i18n';
 import { ShareButton } from './ShareButton';
 import { track } from '../analytics';
+import { ArchLegacy } from './arch/ArchControls';
+import { ArchReport } from './arch/ArchReport';
 
 /** «Мия, Борис и Тимур». */
 const names = (list: string[]) => {
@@ -82,6 +84,8 @@ export function EpilogueModal({ modal }: { modal: WeekModal }) {
         </div>
 
         {neighbours && <p className="neighbours">{neighbours}</p>}
+        <ArchLegacy />
+        <ArchReport lines={modal.report.players[HUMAN].arch} />
         <p className="hint-text">
           {t.ui.epilogue.hint}
         </p>

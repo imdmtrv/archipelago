@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GOALS, PROFESSION_ORDER, type ProfessionId, type EngineError, type GameEvent, type GoalReward, type PlayerState, type RumorView, type Sector, type SlotType, type WeekNewsItem } from '@arch/engine';
+import { GOALS, PROFESSION_ORDER, type BusinessId, type IslandId, type ProfessionId, type EngineError, type GameEvent, type GoalReward, type PlayerState, type RumorView, type Sector, type SlotType, type WeekNewsItem } from '@arch/engine';
 import { ru, type Dict } from './ru';
 import { en } from './en';
 import type { ChallengeData, Moment } from '../challenge';
@@ -205,6 +205,35 @@ export function eventCopy(event: GameEvent, players: readonly PlayerState[] = []
   const { t } = getI18n();
   const p = event.params ?? {};
   switch (event.id) {
+    case 'archStorm':
+    case 'archStormInsured': {
+      const business = t.arch.businesses[p.business as BusinessId];
+      const island = t.arch.islands[p.island as IslandId];
+      if (!business || !island) return { title: t.arch.report.title, text: '' };
+      return event.id === 'archStorm'
+        ? { title: t.arch.events.archStorm.title(island), text: t.arch.events.archStorm.text(business.title, business.female, coins(Number(p.cost ?? 0))) }
+        : { title: t.arch.events.archStormInsured.title(island), text: t.arch.events.archStormInsured.text(business.title, business.female) };
+    }
+    case 'archLoanRepaid':
+    case 'archLoanLost': {
+      const id = String(p.borrower);
+      const name = id === 'npc' ? t.arch.choices.bankLoan.npc : newsPlayer(id, players);
+      const copy = t.arch.events[event.id];
+      return { title: copy.title, text: copy.text(name, femaleBot(id), coins(Number(p.amount ?? 0))) };
+    }
+    case 'archNeighborBuilt': {
+      const id = String(p.botId), name = newsPlayer(id, players);
+      const business = t.arch.businesses[p.business as BusinessId];
+      const copy = t.arch.events.archNeighborBuilt;
+      return { title: copy.title(name, business.title), text: copy.text(name, femaleBot(id), business.title) };
+    }
+    case 'archMainlandBuilt': {
+      const id = p.business as BusinessId, business = t.arch.businesses[id];
+      const islands: Record<BusinessId, IslandId> = { cannery: 'pelican', hotel: 'shell', coldStore: 'lighthouse', shipyard: 'cedar', bank: 'big' };
+      const copy = t.arch.events.archMainlandBuilt;
+      return { title: copy.title(business.title), text: copy.text(business.title, t.arch.islands[islands[id]]) };
+    }
+    case 'archFinale': return t.arch.events.archFinale;
     case 'layoff': {
       const profession = PROFESSION_ORDER.includes(p.profession as ProfessionId) ? p.profession as ProfessionId : 'teacher';
       return { title: t.events.layoff.title, text: t.events.layoff.text(t.events.layoff.reason[profession], weeksAcc(Number(p.weeks))) };

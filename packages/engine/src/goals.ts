@@ -20,13 +20,13 @@ function fillGoals(goals: GoalsState): void {
 }
 
 export function goalProgress(world: WorldState, player: PlayerState, id: string): GoalView {
-  const passive = realPassiveIncome(player, world.market);
-  const freedom = Math.round(realFreedomRatio(player, world.market) * 100);
+  const passive = realPassiveIncome(player, world.market, world);
+  const freedom = Math.round(realFreedomRatio(player, world.market, world) * 100);
   const salary = player.employed && player.layoffWeeks === 0
     ? Math.round(player.salary * (player.extraShift ? 1 + R.EXTRA_SHIFT_BONUS : 1)) : 0;
   const progress: Record<string, [number, number]> = {
     study: [Math.min(player.knowledge, 1), 1],
-    cushion: [player.cash, 3 * weeklyExpenses(player).total],
+    cushion: [player.cash, 3 * weeklyExpenses(player, world).total],
     sectors: [new Set(player.owned.filter((a) => getDef(a.defId).kind === 'asset').map((a) => getDef(a.defId).sector)).size, 3],
     passive100: [passive, 100],
     upgrade: [Number(player.owned.some((a) => a.level >= 2)), 1],

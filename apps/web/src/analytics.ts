@@ -1,4 +1,4 @@
-import { getPlayer, type ProfessionId } from '@arch/engine';
+import { archipelagoView, getPlayer, type ArchSetId, type BusinessId, type ProfessionId } from '@arch/engine';
 import { HUMAN, useGame } from './store';
 
 export type AnalyticsEvent =
@@ -6,7 +6,9 @@ export type AnalyticsEvent =
   | 'game-start' | 'week-5' | 'week-10' | 'week-20'
   | 'freedom' | 'dream-done' | 'share' | 'feedback-open'
   | 'coach-done' | 'coach-skip' | 'lang-switch' | 'challenge-open' | 'challenge-start'
-  | 'no-webgl' | 'scene-error' | 'js-error';
+  | 'no-webgl' | 'scene-error' | 'js-error'
+  | 'arch-open' | 'arch-mode' | 'arch-route' | 'arch-finale'
+  | `arch-business-${BusinessId}` | `arch-set-${ArchSetId}`;
 
 declare global {
   interface Window {
@@ -86,9 +88,27 @@ export function initAnalytics() {
     document.head.append(script);
   }
 
+  const initialArch = useGame.getState().world?.archipelago;
+  if (initialArch && !initialArch.seen.intro) track('arch-open');
+  if (initialArch?.finaleWeek !== null && initialArch && !initialArch.seen.finale) track('arch-finale');
   useGame.subscribe((state, previous) => {
     const world = state.world, before = previous.world;
     if (!world) return;
+    if (state.archMode !== previous.archMode) track('arch-mode', state.archMode ? 'archipelago' : 'home');
+    if (world !== before) {
+      const arch = archipelagoView(world, HUMAN);
+      const priorArch = before && archipelagoView(before, HUMAN);
+      if (arch && !priorArch) track('arch-open');
+      if (arch && arch.finaleWeek !== null && priorArch?.finaleWeek == null) track('arch-finale');
+      if (arch) {
+        for (const island of arch.islands) {
+          const prior = priorArch?.islands.find((i) => i.island === island.island);
+          if (island.route === null && prior?.route) track('arch-route');
+          if (island.own && !prior?.own) track(`arch-business-${island.business}`);
+        }
+        for (const set of arch.sets) if (set.active && !priorArch?.sets.find((s) => s.id === set.id)?.active) track(`arch-set-${set.id}`);
+      }
+    }
     if (!before) track('game-start');
     if (before) {
       for (const week of [5, 10, 20] as const) {

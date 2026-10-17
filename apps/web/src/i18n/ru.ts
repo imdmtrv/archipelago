@@ -235,6 +235,16 @@ export const ru = {
     dreamBusy: 'Этот этап ещё строится',
     dreamDone: 'Мечта уже готова',
     noChoice: 'Сейчас нечего решать',
+    archClosed: 'Архипелаг откроется при 150%',
+    cannotDefer: 'Это решение нельзя отложить',
+    routeBuilt: 'Паром уже ходит',
+    noRoute: 'Сначала проведите паром',
+    businessTaken: 'Это дело уже построено',
+    businessLimit: 'У вас уже 3 дела из 3',
+    notOwner: 'Это не ваше дело',
+    noDays: 'Нет свободных дней',
+    managerBusy: 'Уже управляет другим делом',
+    loanTooBig: 'Кредитом — не больше половины цены',
     notEnoughCash: (_n: number, coins: string) => `Не хватает ${coins}`,
     needKnowledge: (n: number) => `Нужно знание ${n}`,
     loanOverLimit: (_n: number, coins: string) => `Банк даёт не больше ${coins}`,
@@ -412,6 +422,201 @@ export const ru = {
     layoffOver: {
       title: 'Работа нашлась',
       text: 'Нашлось новое место — зарплата снова приходит каждую неделю.',
+    },
+  },
+  // Архипелаг: вторая часть игры после 150%. Спецификация — docs/specs/archipelago-screen.md, «Тексты».
+  arch: {
+    toggle: { arch: '🗺 Архипелаг', home: '🏝 Мой остров', attention: 'В архипелаге есть что решить' },
+    /** Строка-обещание в «До финансовой свободы» и подсказка на замке переключателя. */
+    promise: (now: number) => `Архипелаг откроется при 150% — сейчас ${now}%`,
+    back: '← Весь архипелаг',
+    intro: {
+      title: 'Архипелаг открыт',
+      text: 'Вы на 150% — «Уверенность». Соседние острова зовут вас по-крупному: проведите паром, постройте завод, отель или банк. Дел может быть три из пяти — выбирайте, какие. Три дела одного набора приносят больше.',
+      button: 'Посмотреть архипелаг',
+    },
+    firstRouteHint: 'Паром связывает остров с вашим. Без парома дело на острове не построить.',
+    head: {
+      businesses: 'Дела',
+      days: 'Дни',
+      income: 'Архипелаг',
+      of: (a: number, b: number) => `${a} из ${b}`,
+      perWeek: (coins: string) => `${coins}/нед`,
+    },
+    islands: { lighthouse: 'Маяк', pelican: 'Пеликан', shell: 'Ракушка', cedar: 'Кедровый', big: 'Большой' },
+    /** Родительный падеж острова: «паром до Пеликана». */
+    islandsGenitive: { lighthouse: 'Маяка', pelican: 'Пеликана', shell: 'Ракушки', cedar: 'Кедрового', big: 'Большого' },
+    businesses: {
+      cannery: {
+        title: 'Консервный завод', accusative: 'консервный завод', female: false, badge: 'Дело · рыба',
+        text: 'Скупает улов у лодок архипелага и делает из него консервы.',
+        effect: 'Улов всех, кто в сети, дороже на 20%. Чем больше лодок в сети, тем больше доход завода.',
+        onYou: 'Ваш улов +20%',
+      },
+      hotel: {
+        title: 'Отель', accusative: 'отель', female: false, badge: 'Дело · туризм',
+        text: 'Самый большой доход, но гости едут по сезону, а кризис и шторм бьют сильнее всего.',
+        effect: 'Гостей больше с каждым обитаемым островом в сети.',
+        onYou: '',
+      },
+      coldStore: {
+        title: 'Склад-холодильник', accusative: 'склад-холодильник', female: false, badge: 'Дело · защита',
+        text: 'Хранит улов, пока рыба дешёвая. Приносит мало, зато спасает в плохой год.',
+        effect: 'Когда рыба дешевеет, улов сети продаётся по обычной цене. С заводом — и завод не простаивает.',
+        onYou: 'Ваш улов не дешевеет',
+      },
+      shipyard: {
+        title: 'Верфь', accusative: 'верфь', female: true, badge: 'Дело · ремонт',
+        text: 'Строит паромы и чинит лодки после штормов — зарабатывает, когда другим плохо.',
+        effect: 'Паромы на 40% дешевле. Доход за каждую линию и за ремонт после шторма.',
+        onYou: 'Паромы для вас на 40% дешевле',
+      },
+      bank: {
+        title: 'Банк архипелага', accusative: 'банк архипелага', female: false, badge: 'Дело · деньги',
+        text: 'Приезжие и соседи просят в долг, а вы решаете, кому дать.',
+        effect: 'Процент — плата за риск: рискованный платит больше, но чаще не возвращает.',
+        onYou: '',
+      },
+    },
+    sets: {
+      fishing: {
+        title: 'Рыбная связка',
+        text: 'Рыбная связка — завод, склад и верфь: если все три ваши, каждое приносит на 25% больше.',
+      },
+      resort: {
+        title: 'Курорт',
+        text: 'Курорт — отель, верфь и банк: паромы с верфи везут гостей, банк их обслуживает. Все три ваши — +25% к каждому.',
+      },
+      progress: (title: string, have: number, total: number) => `${title} ${have}/${total}`,
+      badge: (title: string) => `Набор: ${title}`,
+      active: '+25% к каждому',
+    },
+    /** Одно слово состояния — для меток над островами и свёрнутых строк. */
+    status: {
+      noRoute: 'нет парома', free: 'свободно', mine: 'ваше', partner: 'в доле', neighbor: 'соседа',
+      mainland: 'материка', damaged: 'повреждено',
+    },
+    card: {
+      resident: (name: string) => `Живёт ${name}`,
+      uninhabited: 'Необитаемый остров',
+      canBuild: (accusative: string) => `Здесь можно построить: ${accusative}`,
+      tickets: (coins: string) => `Билеты ≈ +${coins}/нед чистыми`,
+      buildRoute: (coins: string) => `Провести паром — ${coins}`,
+      cells: { price: 'Цена', income: 'Доход', payback: 'Окупится', upkeep: 'Содерж.', value: 'Стоит' },
+      never: 'никогда',
+      freedom: (before: number, after: number) => `Свобода: ${before}% → ${after}%`,
+      build: (coins: string) => `Построить за ${coins}`,
+      buildLoan: (own: string, loan: string) => `Построить: ${own} своих + ${loan} в кредит`,
+      missing: (coins: string) => `Не хватает ${coins}`,
+      limit: (max: number) => `У вас уже ${max} дела из ${max}`,
+      limitHint: 'Место освободится, если продадите дело покупателю',
+      limitText: 'У вас уже 3 дела из 3. Остальные острова достроят соседи и компания с материка — их заводы и склады работают и на вас.',
+      yours: 'Ваше дело',
+      manager: 'Кто управляет',
+      managerOwner: (days: string) => `Сам · ${days}`,
+      managerHired: (pct: number) => `Наёмный · ${pct}%`,
+      managerNeighbor: (name: string, pct: number) => `${name} · ${pct}%`,
+      repair: (coins: string) => `Починить за ${coins}`,
+      insuredRepair: 'Застраховано — починят бесплатно',
+      partnerWith: (name: string) => `Вы и ${name} — пополам, управляет ${name}`,
+      /** «Отель Мии», «Склад-холодильник компании с материка». */
+      ownedBy: (title: string, whoseGenitive: string) => `${title} ${whoseGenitive}`,
+      mainlandGenitive: 'компании с материка',
+      partnerOffer: (name: string, week: number) => `${name} ждёт ответа до ${week}-й недели`,
+      partnerOpen: 'Ответить',
+    },
+    insurance: {
+      title: 'Страховка дел',
+      premium: (coins: string) => `${coins}/нед`,
+      waiting: (week: number) => `Начнёт действовать с ${week}-й недели`,
+      active: 'Действует: шторм не повредит ваши дела',
+    },
+    choices: {
+      partner: {
+        title: (name: string) => `${name} зовёт в долю`,
+        text: (name: string, female: boolean, accusative: string) =>
+          `${name} ${female ? 'собрала' : 'собрал'} на ${accusative} и предлагает строить вместе: вы платите половину, доход пополам, управляет ${name}.`,
+        half: 'Ваша половина',
+        slot: (n: number, max: number) =>
+          `Место: ${['первое', 'второе', 'третье', 'четвёртое'][n - 1] ?? n} из ${['одного', 'двух', 'трёх', 'четырёх'][max - 1] ?? max}`,
+        accept: (coins: string) => `Войти в долю за ${coins}`,
+        later: (weeks: string) => `Подумаю (ещё ${weeks})`,
+        decline: (female: boolean): string => (female ? 'Пусть строит сама' : 'Пусть строит сам'),
+      },
+      bankLoan: {
+        npc: 'Приезжий',
+        titleNpc: (coins: string) => `Приезжий просит ${coins}`,
+        titleNeighbor: (name: string, coins: string) => `${name} просит ${coins}`,
+        cls: { reliable: 'надёжный', normal: 'обычный', risky: 'рискованный' },
+        terms: (pct: string, term: string, coins: string) => `${pct}% в неделю, ${term} — +${coins}/нед`,
+        risk: {
+          reliable: 'Надёжные заёмщики почти всегда возвращают долг — не вернёт примерно один из тридцати, в кризис — чаще.',
+          normal: 'Обычные заёмщики не возвращают примерно каждый восьмой долг, в кризис — чаще.',
+          risky: 'Рискованные не возвращают примерно каждый третий долг, а в кризис — больше половины.',
+        },
+        rumor: (when: string) => `Ходит надёжный слух: кризис ${when}`,
+        accept: (coins: string) => `Дать ${coins}`,
+        decline: 'Отказать',
+      },
+      bizBuyer: {
+        title: (accusative: string) => `Компания с материка хочет купить ${accusative}`,
+        textNoIncome: (offer: string, title: string) => `Предлагает ${offer}. Сейчас ${title.toLowerCase()} не приносит дохода. Место освободится.`,
+        text: (offer: string, title: string, income: string, weeks: string) =>
+          `Предлагает ${offer}. Сейчас ${title.toLowerCase()} приносит +${income}/нед — это ${weeks} дохода. Место освободится.`,
+        accept: (coins: string) => `Продать за ${coins}`,
+        decline: 'Оставить',
+      },
+    },
+    /** Строки отчёта недели и блока финансов. */
+    report: {
+      title: 'Архипелаг',
+      included: 'В том числе',
+      businesses: 'Дела архипелага',
+      managers: 'Управляющие',
+      routes: 'Паромы',
+      bankInterest: 'Проценты банка',
+      bankLost: 'Невозвращённые займы',
+      upkeep: 'Содержание дел',
+      insurance: 'Страховка дел',
+      repairs: 'Ремонт дел',
+    },
+    /** События недели архипелага (GameEvent.id → текст). */
+    events: {
+      archStorm: {
+        title: (island: string) => `Шторм у острова ${island}`,
+        text: (title: string, female: boolean, coins: string) =>
+          `${title} ${female ? 'повреждена' : 'повреждён'} и не приносит дохода, пока не почините. Ремонт — ${coins}.`,
+      },
+      archStormInsured: {
+        title: (island: string) => `Шторм у острова ${island}`,
+        text: (title: string, female: boolean) => `${title} ${female ? 'пострадала' : 'пострадал'}, но страховка дел оплатила ремонт сразу.`,
+      },
+      archLoanRepaid: {
+        title: 'Заём вернули',
+        text: (who: string, female: boolean, coins: string) => `${who} ${female ? 'вернула' : 'вернул'} долг банку архипелага: ${coins} с процентами.`,
+      },
+      archLoanLost: {
+        title: 'Заём не вернули',
+        text: (who: string, female: boolean, coins: string) => `${who} не ${female ? 'смогла' : 'смог'} расплатиться: ${coins} банку уже не вернуть. Процент — плата как раз за такой риск.`,
+      },
+      archNeighborBuilt: {
+        title: (name: string, title: string) => `${name}: ${title.toLowerCase()} открыт`,
+        text: (name: string, female: boolean, title: string) => `${name} ${female ? 'построила' : 'построил'} ${title.toLowerCase()} на своём острове. Его эффект работает для всей сети.`,
+      },
+      archMainlandBuilt: {
+        title: (title: string) => `Компания с материка: ${title.toLowerCase()}`,
+        text: (title: string, island: string) =>
+          `На острове ${island} открылось новое дело — ${title.toLowerCase()} компании с материка. Доход уходит на материк, но эффект работает для всей сети.`,
+      },
+      archFinale: {
+        title: 'Архипелаг процветает',
+        text: 'Все острова связаны паромами, и на каждом работает крупное дело.',
+      },
+    },
+    epilogue: {
+      legacy: 'Наследие',
+      legacyText: (free: number, coins: string) =>
+        `Свободны соседей: ${free} из 3. Рядом с вами они заработали ${coins}.`,
     },
   },
   ui: {

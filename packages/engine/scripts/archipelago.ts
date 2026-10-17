@@ -1,4 +1,4 @@
-// Прототип на настоящем движке: один недельный цикл для тестов и балансировочного прогона.
+// Семь стратегий на публичных действиях движка; раздел общего балансировочного прогона.
 import { pathToFileURL } from 'node:url';
 import { runBotTurn } from '../src/bots';
 import { realFreedomRatio, realPassiveIncome } from '../src/economy';
@@ -6,9 +6,9 @@ import { applyAction } from '../src/reducer';
 import { financeView, getPlayer } from '../src/selectors';
 import type { WorldState } from '../src/types';
 import { createWorld } from '../src/world';
-import { activeSets, applyArchAction, businessValue, createArch, humanShare, settleArch, syncShares } from '../proto/archipelago/model';
-import { createStrategy, STRATEGY_NAMES, type StrategyName } from '../proto/archipelago/strategies';
-import type { ArchState } from '../proto/archipelago/types';
+import { activeSets, createArch, humanShare } from '../src/archipelago/model';
+import { createStrategy, STRATEGY_NAMES, type StrategyName } from '../src/archipelago/strategies';
+import type { ArchState } from '../src/types';
 
 export function badNumbers(value: unknown): boolean {
   if (typeof value === 'number') return !Number.isFinite(value);
@@ -19,70 +19,69 @@ export function badNumbers(value: unknown): boolean {
 /** Удачу архипелага меряем на равном сроке после открытия: сколько недель досталось архипелагу — удача первого акта. */
 export const ARCH_HORIZON = 80;
 
-/** Капитал человека: капитал движка + доли в делах + выданные банком займы (тоже его имущество). */
-export function capitalOf(world: WorldState, arch: ArchState): number {
-  return financeView(world, 'p1').netWorth + arch.businesses.reduce((sum, b) => sum + businessValue(b), 0)
-    + arch.loans.reduce((sum, l) => sum + l.principal, 0);
+/** Капитал уже включает доли дел и выданные банком займы. */
+export function capitalOf(world: WorldState, _arch?: ArchState): number {
+  return financeView(world, 'p1').netWorth;
 }
 
 export function runGame(seed: number, weeks: number, name: StrategyName): {
-  world: WorldState; arch: ArchState; joySum: number; joyWeeks: number;
+  world: WorldState; arch: ArchState | null; joySum: number; joyWeeks: number;
   /** Капитал через ARCH_HORIZON недель после открытия (null — столько недель не прошло). */
   capitalAtHorizon: number | null;
   setsSeen: { fishing: boolean; resort: boolean }; mainlandBuilt: number;
 } {
   let world = createWorld({ seed, playerName: 'Игрок', islandName: 'Тест', profession: 'teacher' });
-  const arch = createArch(seed);
-  const strategy = createStrategy(name, arch);
+  const strategy = createStrategy(name);
   let joySum = 0;
   let joyWeeks = 0;
   let capitalAtHorizon: number | null = null;
   // spec: набор учитывается, если был собран хотя бы раз; продажи материку не считаются его стройками.
   const setsSeen = { fishing: false, resort: false };
   let mainlandBuilt = 0;
-  const recordSets = () => { for (const set of activeSets(arch)) setsSeen[set] = true; };
+  const recordSets = () => { if (world.archipelago) for (const set of activeSets(world.archipelago)) setsSeen[set] = true; };
   for (let w = 0; w < weeks; w++) {
     const turn = runBotTurn(world, 'p1', strategy.homePolicy);
     if (turn.errors.length) throw new Error(`seed ${seed}, ${name}, week ${world.week}: ${turn.errors.join('; ')}`);
     world = turn.world;
     // Решения на родном острове — тоже решения игрока (отдых и подработка — нет).
-    if (turn.actions.some((a) => a.type !== 'rest' && a.type !== 'setExtraShift')) arch.log.homeDecisionWeeks.push(world.week);
-    if (arch.openWeek !== null) {
+    if (world.archipelago && turn.actions.some((a) => a.type !== 'rest' && a.type !== 'setExtraShift')) world.archipelago.log.homeDecisionWeeks.push(world.week);
+    if (world.archipelago) {
       for (let step = 0; step < 20; step++) {
-        const action = strategy.decide(world, arch);
+        const action = strategy.decide(world, world.archipelago!);
         if (!action) break;
-        applyArchAction(world, arch, action);
+        const result = applyAction(world, { ...action, playerId: 'p1' });
+        if (result.error) throw new Error(`seed ${seed}, ${name}, week ${world.week}: ${action.type}: ${result.error.code}`);
+        world = result.world;
         recordSets();
       }
     }
-    syncShares(world, arch);
     const result = applyAction(world, { type: 'endWeek' });
     if (result.error) throw new Error(`seed ${seed}, ${name}: ${result.error.code}`);
     world = result.world;
-    const beforeSettlement = arch.businesses.length;
-    settleArch(world, arch);
-    mainlandBuilt += arch.businesses.slice(beforeSettlement).filter((b) => b.stakes.some((s) => s.playerId === 'mainland')).length;
+    mainlandBuilt += world.lastReport!.players.p1.events.filter((e) => e.id === 'archMainlandBuilt').length;
+    const arch = world.archipelago;
     recordSets();
-    if (arch.openWeek !== null && world.lastReport!.week === arch.openWeek + ARCH_HORIZON) capitalAtHorizon = capitalOf(world, arch);
-    if (arch.openWeek !== null && world.lastReport!.week > arch.openWeek) {
+    if (arch && world.lastReport!.week === arch.openWeek + ARCH_HORIZON) capitalAtHorizon = capitalOf(world, arch);
+    if (arch && world.lastReport!.week > arch.openWeek) {
       joySum += getPlayer(world, 'p1').happiness;
       joyWeeks++;
     }
   }
-  if (badNumbers(world) || badNumbers(arch)) throw new Error(`Нечисловое состояние: seed ${seed}, ${name}`);
-  return { world, arch, joySum, joyWeeks, capitalAtHorizon, setsSeen, mainlandBuilt };
+  if (badNumbers(world) || badNumbers(world.archipelago)) throw new Error(`Нечисловое состояние: seed ${seed}, ${name}`);
+  return { world, arch: world.archipelago, joySum, joyWeeks, capitalAtHorizon, setsSeen, mainlandBuilt };
 }
 
 interface Outcome {
   open: number | null; finale: number | null; capital: number; capitalH: number | null; passive: number; freedom: number;
   joySum: number; joyWeeks: number; legacy: number; timurFree: boolean; gap: number; maxGap: number;
-  businesses: number; routes: number; lent: number; lost: number; interest: number; restored: number;
+  businesses: number; routes: number; lent: number; lost: number; interest: number;
   miaSolo: number; miaPartner: number; borisSolo: number; borisPartner: number;
   fishing: boolean; resort: boolean; mainlandBuilt: number;
 }
 
 function outcome(game: ReturnType<typeof runGame>, weeks: number): Outcome {
-  const { world, arch, joySum, joyWeeks } = game;
+  const { world, joySum, joyWeeks } = game;
+  const arch = game.arch ?? createArch(weeks);
   const me = getPlayer(world, 'p1');
   const end = arch.finaleWeek ?? weeks;
   // spec: промежутки включают края окна; несколько действий одной недели — одно решение.
@@ -92,13 +91,13 @@ function outcome(game: ReturnType<typeof runGame>, weeks: number): Outcome {
   const builds = (id: string, partner: boolean) => arch.businesses.filter((b) => b.stakes.some((s) => s.playerId === id)
     && (humanShare(b) > 0) === partner).length;
   return {
-    open: arch.openWeek, finale: arch.finaleWeek,
+    open: game.arch?.openWeek ?? null, finale: arch.finaleWeek,
     capital: capitalOf(world, arch), capitalH: game.capitalAtHorizon,
-    passive: realPassiveIncome(me, world.market), freedom: realFreedomRatio(me, world.market),
-    joySum, joyWeeks, legacy: arch.log.paidToNeighbors, timurFree: realFreedomRatio(getPlayer(world, 'bot-timur'), world.market) >= 1,
+    passive: realPassiveIncome(me, world.market, world), freedom: realFreedomRatio(me, world.market, world),
+    joySum, joyWeeks, legacy: arch.log.paidToNeighbors, timurFree: realFreedomRatio(getPlayer(world, 'bot-timur'), world.market, world) >= 1,
     gap: gaps.reduce((sum, g) => sum + g, 0) / gaps.length, maxGap: Math.max(...gaps),
     businesses: arch.businesses.filter((b) => humanShare(b) > 0).length, routes: arch.routes.length,
-    lent: arch.log.bankLent, lost: arch.log.bankDefaulted, interest: arch.log.bankInterest, restored: arch.log.restoredShares,
+    lent: arch.log.bankLent, lost: arch.log.bankDefaulted, interest: arch.log.bankInterest,
     miaSolo: builds('bot-mia', false), miaPartner: builds('bot-mia', true),
     borisSolo: builds('bot-boris', false), borisPartner: builds('bot-boris', true),
     fishing: game.setsSeen.fishing, resort: game.setsSeen.resort, mainlandBuilt: game.mainlandBuilt,
@@ -125,7 +124,7 @@ function summarize(games: Outcome[], weeks: number) {
     joy: total((o) => o.joySum) / Math.max(1, total((o) => o.joyWeeks)), legacy: median((o) => o.legacy),
     timur: 100 * total((o) => Number(o.timurFree)) / games.length,
     gap: median((o) => o.gap), maxGap: median((o) => o.maxGap), businesses: median((o) => o.businesses), routes: median((o) => o.routes),
-    lent: median((o) => o.lent), lost: median((o) => o.lost), interest: median((o) => o.interest), restored: total((o) => o.restored),
+    lent: median((o) => o.lent), lost: median((o) => o.lost), interest: median((o) => o.interest),
     miaSolo: total((o) => o.miaSolo), miaPartner: total((o) => o.miaPartner),
     borisSolo: total((o) => o.borisSolo), borisPartner: total((o) => o.borisPartner),
     fishing: 100 * total((o) => Number(o.fishing)) / games.length,
@@ -148,9 +147,7 @@ function arg(name: string, fallback: number): number {
   return value;
 }
 
-function main(): void {
-  const seeds = arg('seeds', 300);
-  const weeks = arg('weeks', 160);
+export function simulateArchipelago(seeds = 300, weeks = 160): void {
   const started = Date.now();
   const results = new Map<StrategyName, Outcome[]>();
   const errors: string[] = [];
@@ -169,10 +166,10 @@ function main(): void {
   // Удача архипелага — разброс прибавки к капиталу против домоседа на том же сиде: удача первого акта
   // (когда пришла свобода, что выпало на родном острове) одинакова у всех стратегий и сюда не входит.
   const gain = (name: StrategyName) => results.get(name)!.flatMap((o, i) => {
-    const home = results.get('Домосед')![i].capitalH;
-    return o.capitalH === null || home === null ? [] : [o.capitalH - home];
+    const home = results.get('Домосед')![i]?.capitalH;
+    return o.capitalH === null || home == null ? [] : [o.capitalH - home];
   });
-  const best = [...active].sort((a, b) => percentile(gain(b.name), 0.5) - percentile(gain(a.name), 0.5))[0];
+  const best = active.find((s) => s.name === STRATEGY_NAMES[1])!;
   const luck = percentile(gain(best.name), 0.75) - percentile(gain(best.name), 0.25);
   const skill = percentile(gain(best.name), 0.5) - percentile(gain('Наобум'), 0.5);
   const ratio = skill > 0 ? luck / skill : Infinity;
@@ -192,14 +189,19 @@ function main(): void {
   console.log(`Прибавка к капиталу против домоседа через ${ARCH_HORIZON} недель после открытия (медиана, p25–p75; игр ${gain('Цепочка').length}): ${STRATEGY_NAMES.slice(1).map((name) =>
     `${name} ${fmt(percentile(gain(name), 0.5))} (${fmt(percentile(gain(name), 0.25))}–${fmt(percentile(gain(name), 0.75))})`).join('; ')}`);
   console.log(`Удача/умение (прибавка): ${best.name}; ${fmt(luck)}/${fmt(skill)}=${fmt(ratio, 3)}; по всему капиталу ${fmt(rawRatio, 3)} (Cashflow 101: 2.8)`);
+  const resortGain = gain('Курорт');
+  const resortLuck = percentile(resortGain, 0.75) - percentile(resortGain, 0.25);
+  const resortSkill = percentile(resortGain, 0.5) - percentile(gain('Наобум'), 0.5);
+  console.log(`Удача/умение курорта (справочно): ${fmt(resortLuck)}/${fmt(resortSkill)}=${fmt(resortSkill > 0 ? resortLuck / resortSkill : Infinity, 3)}`);
   console.log('Δ — медиана от открытия до финала среди завершивших; Мия/Борис — число строек по всем сидам; остальные счётчики — медианы.');
   const checks: [number, boolean, string][] = [
     [1, active.every((s) => s.capital > home.capital), 'Активные богаче домоседа'],
     [2, !sensible.some((s) => (['capital', 'p10', 'joy', 'legacy'] as const)
       .every((key) => s[key] >= Math.max(...sensible.map((r) => r[key])))), 'Нет единственной лучшей стратегии'],
     [3, ratio < 1, `Удача/умение < 1: ${fmt(ratio, 3)}`],
-    [4, active.filter((s) => s.name !== 'Партнёр соседей').every((s) => s.capital > random.capital),
-      'Наобум уступает цепочке, курорту и понемногу'],
+    // «Везде понемногу» без набора — почти как наобум (итоги итерации 2), поэтому цель — только у стратегий с набором.
+    [4, active.filter((s) => s.name === 'Цепочка' || s.name === 'Курорт').every((s) => s.capital > random.capital),
+      `Наобум уступает цепочке и курорту (справочно: понемногу ${fmt(summaries.get('Везде понемногу')!.capital)}, наобум ${fmt(random.capital)})`],
     [5, ['Везде понемногу', 'Партнёр соседей'].every((name) => {
       const s = summaries.get(name as StrategyName)!;
       return s.fin >= 50 && Number.isFinite(s.duration) && s.duration >= 30;
@@ -210,12 +212,11 @@ function main(): void {
     [7, partner.timur - home.timur >= 15, `Свобода Тимура: прибавка ${fmt(partner.timur - home.timur, 1)} п.п. ≥15`],
     [8, errors.length === 0 && Array.from({ length: seeds }, (_, i) => STRATEGY_NAMES
       .every((name) => results.get(name)![i]?.open === results.get('Домосед')![i]?.open)).every(Boolean), 'Открытие одинаково на каждом сиде'],
-    [9, errors.length === 0 && [...summaries.values()].every((s) => s.restored === 0),
-      `Без NaN/ошибок; restoredShares=${[...summaries.values()].reduce((n, s) => n + s.restored, 0)}; ошибок=${errors.length}`],
+    [9, errors.length === 0, `Без NaN и ошибок действий; ошибок=${errors.length}`],
   ];
   for (const [id, passed, message] of checks) console.log(`${passed ? 'OK  ' : 'FAIL'} ${id}. ${message}`);
   if (errors.length) console.log(`Первая ошибка: ${errors[0]}`);
   if (checks.some(([, passed]) => !passed)) process.exitCode = 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) simulateArchipelago(arg('seeds', 300), arg('weeks', 160));

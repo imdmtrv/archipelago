@@ -86,15 +86,26 @@ export interface UpcomingEvent {
   announcedWeek: number;     // в конце какой недели пошёл слух
 }
 
-export type ChoiceKind = 'neighborLoan' | 'fireSale' | 'buyer';
+/** partner, bankLoan, bizBuyer — развилки архипелага (docs/specs/archipelago-screen.md, «Развилки архипелага»). */
+export type ChoiceKind = 'neighborLoan' | 'fireSale' | 'buyer' | 'partner' | 'bankLoan' | 'bizBuyer';
 
 /** Развилка: выпадает в конце недели, игрок решает её в течение следующей недели `week`. */
 export interface PendingChoice {
   uid: string;
   kind: ChoiceKind;
   week: number;
-  /** neighborLoan: neighborId, amount; fireSale: neighborId, assetUid, price; buyer: assetUid, offer. */
+  /**
+   * neighborLoan: neighborId, amount; fireSale: neighborId, assetUid, price; buyer: assetUid, offer;
+   * partner: botId, business; bankLoan: borrower ('npc' | id бота), cls, amount, weeklyRate, term; bizBuyer: business, offer.
+   */
   params: Record<string, EventParam>;
+  /**
+   * Последняя неделя, когда ответ ещё принимается (партнёрство — week + PARTNER_WAIT_WEEKS − 1).
+   * Нет поля — только неделя `week`, как у прежних развилок. Нерешённая к концу expiresWeek развилка = отказ.
+   */
+  expiresWeek?: number;
+  /** Игрок нажал «Подумаю»: окно само больше не открывается, напоминают карточка острова и точка на переключателе. */
+  deferred?: boolean;
 }
 
 /** Монеты, которые игрок одолжил соседу. */
@@ -255,6 +266,8 @@ export interface PlayerWeekReport {
   /** Активы, исчезнувшие на этой неделе (аферы). */
   lostAssetUids: string[];
   freedomReached: boolean;   // true только в ту неделю, когда свобода достигнута впервые
+  /** Строки архипелага за неделю (входят в net); null — архипелаг ещё закрыт. */
+  arch: ArchWeekLines | null;
 }
 
 export interface WeekReport {
@@ -265,7 +278,7 @@ export interface WeekReport {
 }
 
 export interface WorldState {
-  version: 8;
+  version: 9;
   seed: number;
   rng: number;               // текущее состояние ГПСЧ — вся случайность только через него
   nextUid: number;
@@ -276,6 +289,8 @@ export interface WorldState {
   /** Запланированные общие события (не больше одного на неделю). */
   upcoming: UpcomingEvent[];
   lastReport: WeekReport | null;
+  /** Слой «Архипелаг» (вторая часть игры после 150%); null — ещё не открыт. */
+  archipelago: ArchState | null;
 }
 
 // ───────────── Действия ─────────────
@@ -294,7 +309,18 @@ export type Action =
   | { type: 'quitJob'; playerId: string }
   | { type: 'returnToWork'; playerId: string }
   | { type: 'buildDream'; playerId: string }
-  | { type: 'resolveChoice'; playerId: string; accept: boolean }
+  | { type: 'resolveChoice'; playerId: string; accept: boolean; /** partner: сколько взять кредитом (ботам/симулятору; UI — 0). */ loan?: number }
+  /** «Подумаю»: только у развилки с expiresWeek > текущей недели; ставит deferred. */
+  | { type: 'deferChoice'; playerId: string }
+  // ── Архипелаг (действует только человек: playerId — players[0]) ──
+  | { type: 'buildRoute'; playerId: string; island: IslandId }
+  /** loan — сколько взять обычным кредитом (0..BUSINESS_LOAN_SHARE × цены, мимо лимита кредита). */
+  | { type: 'buyBusiness'; playerId: string; business: BusinessId; loan: number }
+  | { type: 'setManager'; playerId: string; business: BusinessId; manager: Manager }
+  | { type: 'repairBusiness'; playerId: string; business: BusinessId }
+  | { type: 'setArchInsurance'; playerId: string; on: boolean }
+  /** Игрок увидел окно «Архипелаг открыт» / эпилог «Архипелаг процветает». */
+  | { type: 'archSeen'; playerId: string; what: 'intro' | 'finale' }
   | { type: 'endWeek' };
 
 export interface ActionResult {
@@ -310,6 +336,10 @@ export const ERROR_CODES = {
   quitBeforeFreedom: 'quitBeforeFreedom', alreadyQuit: 'alreadyQuit', alreadyEmployed: 'alreadyEmployed',
   shiftUnemployed: 'shiftUnemployed', noDream: 'noDream', dreamBeforeFreedom: 'dreamBeforeFreedom',
   dreamBusy: 'dreamBusy', dreamDone: 'dreamDone', noChoice: 'noChoice',
+  // архипелаг
+  archClosed: 'archClosed', cannotDefer: 'cannotDefer', routeBuilt: 'routeBuilt', noRoute: 'noRoute',
+  businessTaken: 'businessTaken', businessLimit: 'businessLimit', notOwner: 'notOwner', noDays: 'noDays',
+  managerBusy: 'managerBusy', loanTooBig: 'loanTooBig',
 } as const;
 
 export type EngineError =
@@ -338,6 +368,11 @@ export interface FinanceView {
   employed: boolean;
   /** Уровень свободы по freedomRatio: 0 — ещё нет, дальше индекс в FREEDOM_LEVELS + 1. */
   level: number;
+  /**
+   * Архипелаг по текущему рынку: income — доходы (доли дел после управляющих, билеты, проценты банка), входят в
+   * passiveIncome; expenses — содержание дел и паромов, страховка дел, входят в expenses.total. 0/0 — закрыт.
+   */
+  arch: { income: number; expenses: number };
 }
 
 export interface OfferView {
@@ -440,6 +475,30 @@ export type ChoiceView =
     saleValue: number;       // сколько дали бы при обычной продаже
     weeklyIncome: number;    // сколько актив приносит сейчас
     freedomBefore: number; freedomAfter: number;
+  }
+  | {
+    kind: 'partner'; uid: string; botId: string; business: BusinessId;
+    half: number;            // ваша половина цены
+    expiresWeek: number; deferred: boolean;
+    slot: { used: number; max: number }; // «Место: третье из трёх» = used + 1 из max
+    canAccept: boolean;
+    reason?: EngineError;    // не хватает монет (notEnoughCash) или мест (businessLimit)
+  }
+  | {
+    kind: 'bankLoan'; uid: string; borrower: string; // 'npc' — приезжий, иначе id бота
+    cls: BankClass; amount: number; weeklyRate: number; term: number;
+    weeklyInterest: number;  // ≈ amount × weeklyRate
+    defaultChance: number;   // шанс невозврата без кризиса (BANK_DEFAULT[cls])
+    crisisRumor: RumorView | null; // надёжный слух о кризисе, если ходит
+    canAccept: boolean;
+    reason?: EngineError;
+  }
+  | {
+    kind: 'bizBuyer'; uid: string; business: BusinessId;
+    offer: number;
+    weeklyIncome: number;    // сколько дело приносит вам сейчас
+    weeksOfIncome: number | null; // offer / weeklyIncome, округлено; null — доход ≤ 0
+    freedomBefore: number; freedomAfter: number;
   };
 
 export interface RumorView {
@@ -462,4 +521,182 @@ export interface GoalsView {
   active: GoalView[];
   done: { id: string; week: number }[];
   total: number;             // сколько целей всего в GOALS
+}
+
+// ───────────── Архипелаг (вторая часть игры после 150%) ─────────────
+// Правила — docs/specs/archipelago.md (итерация 2), экран — docs/specs/archipelago-screen.md.
+
+/** Пять островов горизонта. Три — соседей, два — необитаемые. */
+export type IslandId = 'pelican' | 'shell' | 'lighthouse' | 'cedar' | 'big';
+
+/** Крупные дела: по одному на остров. */
+export type BusinessId = 'cannery' | 'hotel' | 'coldStore' | 'shipyard' | 'bank';
+
+/** Чей индекс рынка множит базовый доход дела. */
+export type ArchSector = 'fish' | 'tourism' | 'stable';
+
+/** Наборы «как улицы одного цвета»: рыбная связка и курорт. */
+export type ArchSetId = 'fishing' | 'resort';
+
+export interface IslandDef {
+  id: IslandId;
+  /** id бота-жителя ('bot-boris' …) или null — остров необитаем. */
+  resident: string | null;
+  business: BusinessId;
+}
+
+export interface BusinessDef {
+  id: BusinessId;
+  island: IslandId;
+  price: number;
+  baseIncome: number;        // в неделю до множителей
+  upkeep: number;
+  sector: ArchSector;
+  stormRisk: number;         // шанс повреждения, когда шторм пришёл на этот остров (до STORM_HIT_MULT)
+  resaleRate: number;        // доля цены в капитале и при обычной продаже
+}
+
+/** Доля в деле. Сумма долей = 1. playerId — 'p1', id бота или 'mainland' (компания с материка). */
+export interface Stake {
+  playerId: string;
+  share: number;             // 1 или 0.5
+}
+
+/**
+ * Кто управляет делом: 'owner' — сам (занимает день недели); 'hired' — наёмный (HIRED_MANAGER_SHARE дохода);
+ * { neighborId } — сосед (NEIGHBOR_MANAGER_SHARE); 'partner' — партнёр-бот, материк или бот-владелец.
+ */
+export type Manager = 'owner' | 'hired' | 'partner' | { neighborId: string };
+
+export interface BusinessState {
+  id: BusinessId;
+  stakes: Stake[];
+  manager: Manager;
+  damaged: boolean;
+  builtWeek: number;
+}
+
+export type BankClass = 'reliable' | 'normal' | 'risky';
+
+export interface BankLoan {
+  uid: string;
+  borrower: string;          // 'npc' — приезжий (проценты еженедельно); id бота — сосед (всё разом в конце срока)
+  cls: BankClass;
+  principal: number;
+  weeklyRate: number;
+  startWeek: number;
+  dueWeek: number;
+  tries: number;
+  crisisSeen: boolean;
+}
+
+/** Счётчики человека для симулятора и эпилога («Наследие»). */
+export interface ArchLog {
+  decisionWeeks: number[];
+  homeDecisionWeeks: number[];
+  paidToNeighbors: number;   // монет ушло соседям как управляющим и партнёрам
+  bankLent: number;
+  bankDefaulted: number;
+  bankInterest: number;
+  repairs: number;
+  businessIncome: number;
+}
+
+/** Состояние архипелага в мире. Своего ГПСЧ нет — вся случайность через world.rng. */
+export interface ArchState {
+  /** Ремонт, оплаченный действиями в текущей неделе; переносится в отчёт без повторного списания. */
+  pendingRepairs?: number;
+  openWeek: number;          // неделя открытия (человек впервые на 150%, или загрузка такого сохранения)
+  routes: IslandId[];        // паромы от родного острова; сеть = родной + эти острова
+  businesses: BusinessState[];
+  loans: BankLoan[];
+  /** Страховка дел: с какой недели действует (оформление + INSURANCE_WAIT_WEEKS); null — нет. */
+  insuredFrom: number | null;
+  mainlandFrom: number | null; // с какой недели материк достраивает архипелаг
+  finaleWeek: number | null;   // «Архипелаг процветает»
+  /** Окна, которые игрок уже видел: «Архипелаг открыт» и эпилог финала. */
+  seen: { intro: boolean; finale: boolean };
+  log: ArchLog;
+}
+
+/** Строки архипелага в отчёте недели человека. Все суммы ≥ 0, кроме routes; расходы вычитаются. */
+export interface ArchWeekLines {
+  businesses: number;        // «Дела архипелага»: валовой доход ваших долей (с бонусом набора)
+  managers: number;          // «Управляющие»: плата наёмным и соседям
+  routes: number;            // «Паромы»: билеты минус содержание (может быть < 0)
+  bankInterest: number;      // «Проценты банка»: полученные проценты
+  bankLost: number;          // невозвращённый основной долг
+  upkeep: number;            // содержание дел
+  insurance: number;         // страховка дел
+  repairs: number;           // ремонт дел за неделю
+  /** Дела, повреждённые штормом на этой неделе. */
+  damaged: BusinessId[];
+  opened: boolean;           // архипелаг открылся на этой неделе
+  finale: boolean;           // финал достигнут на этой неделе
+}
+
+// ── Вид архипелага для UI (селектор archipelagoView) ──
+
+/** noRoute — нет парома; free — паром есть, дело не построено; mine — ваше целиком; partner — в доле с соседом;
+ *  neighbor — дело соседа-бота; mainland — компании с материка. */
+export type ArchIslandStatus = 'noRoute' | 'free' | 'mine' | 'partner' | 'neighbor' | 'mainland';
+
+export interface ArchManagerOption {
+  manager: Manager;          // 'owner' | 'hired' | { neighborId }
+  feeShare: number;          // 0 — сам, HIRED_MANAGER_SHARE, NEIGHBOR_MANAGER_SHARE
+  current: boolean;
+  available: boolean;
+  /** noDays — нет свободных дней; noRoute — сосед вне сети. Сосед может управлять несколькими делами (как в прототипе). */
+  reason?: EngineError;
+}
+
+export interface ArchIslandView {
+  island: IslandId;
+  business: BusinessId;
+  resident: string | null;   // id бота-жителя
+  status: ArchIslandStatus;
+  owner: string | null;      // id владельца большей доли: 'p1', бот, 'mainland'; null — не построено
+  damaged: boolean;
+  sets: ArchSetId[];         // в каких наборах дело
+  /** Паром ещё не проведён: цена (с верфью дешевле), чистые билеты в неделю. null — паром есть. */
+  route: { cost: number; ticketsNet: number; canBuild: boolean; reason?: EngineError } | null;
+  /** status 'free' (и 'noRoute' — для показа): покупка. income — ожидаемый чистый доход в неделю
+   *  (сам управляет; с бонусом набора, если покупка его собирает). */
+  buy: {
+    price: number; income: number; paybackWeeks: number | null; freedomAfter: number;
+    /** Сколько взять в кредит, если своих не хватает (0 — хватает; null — не выручит и кредит). */
+    loanNeeded: number | null;
+    canBuy: boolean; reason?: EngineError; // businessLimit, notEnoughCash, noRoute
+  } | null;
+  /** status 'mine' | 'partner': ваша доля. income — после управляющего, с бонусом набора. */
+  own: {
+    share: number; income: number; upkeep: number; value: number;
+    repairCost: number;      // 0 — не повреждено
+    insured: boolean;        // страховка дел действует — ремонт бесплатный
+    managers: ArchManagerOption[]; // пусто у доли в партнёрстве (управляет партнёр)
+    partnerId: string | null;      // с кем пополам
+  } | null;
+  /** Чужое дело в вашей сети действует на вас (завод, склад, верфь). */
+  effectOnYou: boolean;
+  /** Ждущее предложение партнёрства по этому делу (развилка partner): до какой недели; null — нет. */
+  partnerOfferUntil: number | null;
+  /** Есть что решить: паром или дело по карману, поломка, ждущее партнёрство. */
+  attention: boolean;
+}
+
+export interface ArchSetView { id: ArchSetId; have: number; total: number; active: boolean }
+
+export interface ArchipelagoView {
+  openWeek: number;
+  businesses: { have: number; max: number };
+  days: { used: number; total: number };
+  weeklyNet: number;         // «Архипелаг +420/нед» = FinanceView.arch.income − FinanceView.arch.expenses
+  sets: ArchSetView[];
+  /** Порядок карты: lighthouse, pelican, shell, cedar, big (ARCH_MAP_ORDER). */
+  islands: ArchIslandView[];
+  insurance: { on: boolean; activeFrom: number | null; premium: number };
+  attention: boolean;        // точка на переключателе: что-то из islands.attention или развилка архипелага
+  finaleWeek: number | null;
+  legacy: { freeNeighbors: number; paidToNeighbors: number };
+  seen: { intro: boolean; finale: boolean };
 }

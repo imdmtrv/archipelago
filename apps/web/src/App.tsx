@@ -12,6 +12,8 @@ import { useUiSound } from './audio/useUiSound';
 import { Coach } from './ui/GuidedCoach';
 import { initAnalytics, track } from './analytics';
 import { decodeChallenge } from './challenge';
+import { useArchScene } from './ui/arch/ArchPanel';
+import { ArchMilestoneModal } from './ui/arch/ArchControls';
 
 initAnalytics();
 
@@ -46,6 +48,7 @@ function useSideInsets(enabled: boolean): [number, number] {
 export default function App() {
   useUiSound();
   const world = useGame((s) => s.world);
+  const arch = useArchScene();
   const [invite, setInvite] = useState(incomingChallenge);
   const floats = useGame((s) => s.floats);
   const weather = useGame((s) => s.weather);
@@ -72,6 +75,7 @@ export default function App() {
         bottomInset={isMobile ? (sheetOpen ? 0.58 : 0.26) : 0}
         sideInsets={sideInsets}
         onItemClick={focusItem}
+        arch={arch}
       />
       {world && (
         <div className={`hud ${isMobile ? 'mobile' : 'desktop'}`}>
@@ -83,6 +87,7 @@ export default function App() {
       {world && isMobile && <NeighborModal />}
       <WeekModal />
       <ChoiceModal />
+      <ArchMilestoneModal />
       {world && <FeedbackPrompt />}
       <ToastView />
       <ShareDialog />

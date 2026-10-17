@@ -2,7 +2,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
-  BackSide, Color, type DirectionalLight, type Fog, type HemisphereLight, ShaderMaterial, SphereGeometry,
+  BackSide, Color, type DirectionalLight, type Fog, type HemisphereLight, type Mesh, ShaderMaterial, SphereGeometry,
 } from 'three';
 import { PAL } from '../palette';
 import { useBus } from '../bus';
@@ -10,8 +10,9 @@ import { WX, mixWx, stepWeather } from '../weather';
 
 const WHITE = new Color(PAL.white);
 
-function Sky() {
+function Sky({ archOn }: { archOn: boolean }) {
   const bus = useBus();
+  const sky = useRef<Mesh>(null!);
   const { geo, material } = useMemo(() => {
     const material = new ShaderMaterial({
       side: BackSide,
@@ -33,6 +34,7 @@ function Sky() {
   }, []);
 
   useFrame(() => {
+    sky.current.scale.setScalar(archOn || document.documentElement.dataset.archCamera === 'flying' ? 4 : 1);
     const { k, flash } = bus.weather;
     const u = material.uniforms;
     mixWx(u.top.value as Color, WX.skyTop, k);
@@ -43,10 +45,10 @@ function Sky() {
     }
   });
 
-  return <mesh geometry={geo} material={material} renderOrder={-1} frustumCulled={false} raycast={() => null} />;
+  return <mesh ref={sky} geometry={geo} material={material} scale={archOn ? 4 : 1} renderOrder={-1} frustumCulled={false} raycast={() => null} />;
 }
 
-export function Atmosphere() {
+export function Atmosphere({ archOn = false }: { archOn?: boolean }) {
   const bus = useBus();
   const hemi = useRef<HemisphereLight>(null!);
   const sun = useRef<DirectionalLight>(null!);
@@ -64,7 +66,7 @@ export function Atmosphere() {
   // Шаг погоды — раньше всех остальных подписчиков кадра
   useFrame((state, dt) => stepWeather(bus.weather, Math.min(dt, 0.1), state.clock.elapsedTime), -2);
 
-  useFrame(() => {
+  useFrame((state) => {
     const { k, flash } = bus.weather;
     mixWx(hemi.current.color, WX.hemiSky, k);
     mixWx(hemi.current.groundColor, WX.hemiGround, k);
@@ -73,8 +75,9 @@ export function Atmosphere() {
     sun.current.intensity = 2.7 - 2.05 * k;
     const f = fog.current;
     mixWx(f.color, WX.horizon, k);
-    f.near = 85 - 35 * k;
-    f.far = 210 - 60 * k;
+    const wide = archOn || document.documentElement.dataset.archCamera === 'flying';
+    f.near = wide ? Math.max(170, state.camera.position.length() + 90) : 85 - 35 * k;
+    f.far = wide ? f.near + 330 : 210 - 60 * k;
   });
 
   return (
@@ -82,7 +85,7 @@ export function Atmosphere() {
       <fog ref={fog} attach="fog" args={[PAL.skyHorizon, 85, 210]} />
       <hemisphereLight ref={hemi} args={[PAL.hemiSky, PAL.hemiGround, 1.5]} />
       <directionalLight ref={sun} color={PAL.sun} intensity={2.7} position={[-14, 32, 26]} castShadow />
-      <Sky />
+      <Sky archOn={archOn} />
     </>
   );
 }

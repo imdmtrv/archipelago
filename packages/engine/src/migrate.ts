@@ -1,4 +1,8 @@
-// Миграция сохранений: старые версии последовательно приводятся к текущей v8.
+import { createArch } from './archipelago/model';
+import { realFreedomRatio } from './economy';
+import { FREEDOM_LEVEL_RATIOS } from './rules';
+import { validArchState, validArchChoice } from './archipelago/validation';
+// Миграция сохранений: старые версии последовательно приводятся к текущей v9.
 // Вход — «сырой» JSON из localStorage, поэтому всё проверяем руками; непонятное — null.
 import { DREAMS, GOALS, PROFESSIONS } from './content';
 import { newGoalsState } from './goals';
@@ -116,7 +120,7 @@ function isWorldBase(raw: unknown): raw is Obj & { players: unknown[] } {
 }
 
 /**
- * Принимает сохранённый мир версии 1–8 и возвращает мир версии 8 (копию, вход не меняется).
+ * Принимает сохранённый мир версии 1–9 и возвращает мир версии 9 (копию, вход не меняется).
  * Версия 1 сначала становится версией 2: игрок-человек (первый, не бот) получает чистую мечту,
  * все остаются на работе, уже достигнутая свобода считается первым уровнем.
  * Версия 2 становится версией 3: всё купленное — первого уровня. Всё непонятное — null.
@@ -124,7 +128,7 @@ function isWorldBase(raw: unknown): raw is Obj & { players: unknown[] } {
 export function migrateWorld(raw: unknown): WorldState | null {
   if (!isWorldBase(raw)) return null;
   const version = raw.version;
-  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6 && version !== 7 && version !== 8) return null;
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6 && version !== 7 && version !== 8 && version !== 9) return null;
 
   let world: Obj;
   try {
@@ -155,6 +159,8 @@ export function migrateWorld(raw: unknown): WorldState | null {
     if (version < 8) v7ToV8(world);
     else if (!(players as Obj[]).every((p) => isObj(p.noAskUntil)
       && Object.values(p.noAskUntil).every((week) => isNum(week) && Number.isInteger(week) && week >= 0))) return null;
+    if (version < 9) v8ToV9(world);
+    else if (!validArchState(world.archipelago, (world.players as Obj[]).map((p) => String(p.id)))) return null;
     return world as unknown as WorldState;
   }
 
@@ -175,6 +181,7 @@ export function migrateWorld(raw: unknown): WorldState | null {
   world.upcoming = [];
   v6ToV7(world);
   v7ToV8(world);
+  v8ToV9(world);
   return world as unknown as WorldState;
 }
 
@@ -182,6 +189,16 @@ export function migrateWorld(raw: unknown): WorldState | null {
 function v7ToV8(world: Obj): void {
   for (const p of world.players as Obj[]) p.noAskUntil = {};
   world.version = 8;
+}
+
+/** 8 → 9: открываем архипелаг у уже достигших 150%, в том числе по сохранённому лучшему уровню. */
+function v8ToV9(world: Obj): void {
+  world.archipelago = null;
+  world.version = 9;
+  const current = world as unknown as WorldState;
+  const me = current.players[0];
+  if (me.bestLevel >= 2 || realFreedomRatio(me, current.market, current) >= FREEDOM_LEVEL_RATIOS[1]) current.archipelago = createArch(current.week);
+  if (current.lastReport) for (const report of Object.values(current.lastReport.players)) report.arch = null;
 }
 
 /** 6 → 7: до профессий у всех были числа учителя — им и остаются; зарплата, расходы и деньги сохраняются. */
@@ -200,7 +217,8 @@ function isPlayerEngagement(value: unknown, version: number): boolean {
   return (value.insuranceFrom === null || isNum(value.insuranceFrom))
     && isNum(value.lastChoiceWeek) && (version !== 5 || isNum(value.promotions))
     && (value.choice === null || (isObj(value.choice) && typeof value.choice.uid === 'string'
-      && ['neighborLoan', version === 5 ? 'promotion' : 'fireSale', 'buyer'].includes(String(value.choice.kind))
+      && (['neighborLoan', version === 5 ? 'promotion' : 'fireSale', 'buyer'].includes(String(value.choice.kind))
+        || version >= 9 && validArchChoice(value.choice))
       && isNum(value.choice.week) && isObj(value.choice.params)))
     && Array.isArray(value.lent) && value.lent.every((l) => isObj(l) && typeof l.uid === 'string'
       && typeof l.neighborId === 'string' && isNum(l.amount) && isNum(l.dueWeek) && isNum(l.tries))

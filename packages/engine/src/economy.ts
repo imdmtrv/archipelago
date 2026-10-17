@@ -1,9 +1,10 @@
+import { archProjection, businessValue, fishBonus } from './archipelago/model';
 // Денежные расчёты, общие для редуктора, селекторов и ботов. Только чистые функции.
 import { ASSET_DEFS, DREAMS } from './content';
 import * as R from './rules';
 import { SLOT_CAPACITY } from './slots';
 import type {
-  AssetDef, DreamDef, Loan, MarketState, Offer, OwnedAsset, PlayerState, Sector, SlotType, UpgradeDef,
+  AssetDef, DreamDef, Loan, MarketState, Offer, OwnedAsset, PlayerState, Sector, SlotType, UpgradeDef, WorldState,
 } from './types';
 
 /** id строки содержания готовой мечты в отчёте недели (и якорь мечты в UI/3D). */
@@ -137,34 +138,34 @@ export interface Expenses {
   total: number;
 }
 
-export function weeklyExpenses(player: PlayerState): Expenses {
+export function weeklyExpenses(player: PlayerState, world?: WorldState): Expenses {
   const living = player.living;
-  const upkeep = totalUpkeep(player);
+  const upkeep = totalUpkeep(player) + archProjection(world, player).expenses;
   const interest = totalInterest(player);
   const insurance = player.insured ? insurancePremium(player) : 0;
   return { living, upkeep, interest, insurance, total: living + upkeep + interest + insurance };
 }
 
 /** Ожидаемый пассивный доход по текущему рынку (как его видит игрок, включая аферы). */
-export function passiveIncome(player: PlayerState, market: MarketState): number {
-  return player.owned.reduce((sum, a) => sum + currentIncome(a, market, player.knowledge), 0);
+export function passiveIncome(player: PlayerState, market: MarketState, world?: WorldState): number {
+  return player.owned.reduce((sum, a) => sum + currentIncome(a, market, player.knowledge), 0) + fishBonus(world, player) + archProjection(world, player).income;
 }
 
 /** Настоящий пассивный доход для проверки свободы: доход афер не настоящий. */
-export function realPassiveIncome(player: PlayerState, market: MarketState): number {
+export function realPassiveIncome(player: PlayerState, market: MarketState, world?: WorldState): number {
   return player.owned
     .filter((a) => getDef(a.defId).kind !== 'scam')
-    .reduce((sum, a) => sum + currentIncome(a, market, player.knowledge), 0);
+    .reduce((sum, a) => sum + currentIncome(a, market, player.knowledge), 0) + fishBonus(world, player) + archProjection(world, player).income;
 }
 
-export function isFree(player: PlayerState, market: MarketState): boolean {
-  return realPassiveIncome(player, market) >= weeklyExpenses(player).total;
+export function isFree(player: PlayerState, market: MarketState, world?: WorldState): boolean {
+  return realPassiveIncome(player, market, world) >= weeklyExpenses(player, world).total;
 }
 
 /** Доля настоящей свободы: настоящий пассивный доход / расходы (0, если расходов нет). */
-export function realFreedomRatio(player: PlayerState, market: MarketState): number {
-  const total = weeklyExpenses(player).total;
-  return total > 0 ? realPassiveIncome(player, market) / total : 0;
+export function realFreedomRatio(player: PlayerState, market: MarketState, world?: WorldState): number {
+  const total = weeklyExpenses(player, world).total;
+  return total > 0 ? realPassiveIncome(player, market, world) / total : 0;
 }
 
 /** Уровень свободы: сколько порогов FREEDOM_LEVEL_RATIOS достигнуто (0..3). */
@@ -178,8 +179,10 @@ export function dreamWorkPerWeek(player: PlayerState): number {
 }
 
 /** Готовая мечта — не имущество на продажу: в assetsValue (и в капитал) она не входит. */
-export function assetsValue(player: PlayerState, market: MarketState): number {
-  return player.owned.reduce((sum, a) => sum + saleValue(a, market), 0);
+export function assetsValue(player: PlayerState, market: MarketState, world?: WorldState): number {
+  return player.owned.reduce((sum, a) => sum + saleValue(a, market), 0)
+    + (world?.archipelago?.businesses.reduce((n, b) => n + businessValue(b, player.id), 0) ?? 0)
+    + (world?.archipelago && player.id === world.players[0].id ? world.archipelago.loans.reduce((n, l) => n + l.principal, 0) : 0);
 }
 
 /** Лимит обычного кредита: 5 зарплат + половина стоимости имущества − уже взятые долги. */

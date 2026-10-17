@@ -2,16 +2,18 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
-  BoxGeometry, BufferAttribute, BufferGeometry, Color, Group, type LineSegments, type Mesh,
+  BoxGeometry, BufferAttribute, BufferGeometry, Color, Group, type LineSegments, Mesh,
   MeshStandardMaterial, ShaderMaterial,
 } from 'three';
 import { PAL } from '../palette';
-import { VERTEX_MAT, WINDOW_OPTS, box, cached, ico, mat } from '../materials';
-import { bake, blobGeometry, houseObj, palm, part, roundTree } from '../builders';
+import { VERTEX_MAT, WINDOW_OPTS, box, cached, cone, cyl, hullGeo, ico, mat } from '../materials';
+import { bake, blobGeometry, coneTree, houseObj, palm, part, roundTree } from '../builders';
 import { BEACH_R, BEACH_Y, GRASS_R, GRASS_Y, makeRng, onBeach, onGrass } from '../layout';
 import { useBus } from '../bus';
 import { WX, mixWx } from '../weather';
 import { noRay } from '../models/parts';
+import type { ArchSceneProps } from '../contract';
+import { ARCH_ISLAND_ORDER, ARCH_ISLAND_SCALE, archIslandPosition } from '../archLayout';
 
 // ───── Облака ─────
 interface Cloud { geo: BufferGeometry; scale: number; a: number; r: number; y: number }
@@ -107,16 +109,19 @@ const NEIGHBORS: [number, number, number, number][] = [
   [-0.2, 85, 0.45, PAL.roofCoral], [1.9, 90, 0.4, PAL.roofGold],
 ];
 
-export function Neighbors() {
+export function Neighbors({ arch }: { arch?: ArchSceneProps | null }) {
+  const faded = useMemo(() => new MeshStandardMaterial({ vertexColors: true, flatShading: true, color: PAL.marble, transparent: true, opacity: 0.68, roughness: 0.85 }), []);
+  useEffect(() => () => faded.dispose(), [faded]);
   const islands = useMemo(() => {
     const rng = makeRng(777);
     const { rr } = rng;
-    return NEIGHBORS.map(([a, r, scale, roof]) => {
+    return NEIGHBORS.map(([a, r, scale, roof], index) => {
       const g = new Group();
       const b = part(blobGeometry(BEACH_R, BEACH_R * 1.08, 2.6, 1, 32, scale * 7), PAL.sand);
       b.position.y = BEACH_Y - 1.3; g.add(b);
       const gr = part(blobGeometry(GRASS_R, GRASS_R * 1.04, 1.0, 1, 30, scale * 7), PAL.grass);
       gr.position.y = GRASS_Y - 0.5; g.add(gr);
+      // Жилой дом остаётся только на старом горизонте: в режиме архипелага здесь участок дела.
       const h = houseObj({ roof, w: 3, d: 2.6, h: 2 });
       h.scale.setScalar(1.6); h.position.set(-2, GRASS_Y, -1); h.rotation.y = rr(0, 3); g.add(h);
       for (let i = 0; i < 5; i++) {
@@ -127,19 +132,64 @@ export function Neighbors() {
         const t = roundTree(rng); t.scale.setScalar(1.6);
         t.position.copy(onGrass(rr(-Math.PI, Math.PI), rr(0.3, 0.8))); g.add(t);
       }
-      return { solid: bake(g)!, glow: bake(g, true), x: Math.cos(a) * r, z: Math.sin(a) * r, scale };
+      // Декор — отдельно от жилого дома, чтобы центр дел оставался свободным.
+      g.remove(h);
+      const archGroup = g.clone(true);
+      for (const tree of archGroup.children.slice(2)) {
+        if (Math.hypot(tree.position.x, tree.position.z) < 8) {
+          const angle = Math.atan2(tree.position.z, tree.position.x);
+          tree.position.set(Math.cos(angle) * 9, tree.position.y, Math.sin(angle) * 9);
+        }
+      }
+      const id = ARCH_ISLAND_ORDER[index];
+      const detail = makeRng(900 + index);
+      if (id === 'cedar') {
+        for (let i = 0; i < 9; i++) {
+          const tree = coneTree(detail), angle = i * Math.PI * 2 / 9;
+          tree.position.copy(onGrass(angle, 0.8)); tree.scale.setScalar(1.5); archGroup.add(tree);
+        }
+      } else if (id === 'lighthouse') {
+        const tower = part(cyl(0.65, 0.9, 5.5, 8), PAL.marble);
+        tower.position.set(8, GRASS_Y + 2.75, -5); archGroup.add(tower);
+        const cap = part(cone(1, 1.1, 8), PAL.roofCoral);
+        cap.position.set(8, GRASS_Y + 6, -5); archGroup.add(cap);
+      } else if (id === 'shell') {
+        for (const x of [-5, 5]) {
+          const pole = part(cyl(0.07, 0.07, 2, 6), PAL.white);
+          pole.position.set(x, BEACH_Y + 1, 11); archGroup.add(pole);
+          const shade = part(cone(1.5, 0.6, 8), PAL.roofCoral);
+          shade.position.set(x, BEACH_Y + 2, 11); archGroup.add(shade);
+        }
+      } else if (id === 'pelican') {
+        const fishingBoat = part(hullGeo(4, 0.8, 1.5, 'arch-fishing'), PAL.roofTeal);
+        fishingBoat.position.set(8, BEACH_Y + 0.3, 9); fishingBoat.rotation.y = -0.4; archGroup.add(fishingBoat);
+      } else {
+        for (const x of [-6, 6]) {
+          const home = houseObj({ w: 2.4, d: 2, h: 2.3, roof: PAL.roofCoral });
+          home.position.set(x, GRASS_Y, -7); archGroup.add(home);
+        }
+      }
+      const archSolid = bake(archGroup)!;
+      g.add(h);
+      return { solid: bake(g)!, archSolid, glow: bake(g, true), x: Math.cos(a) * r, z: Math.sin(a) * r, scale };
     });
   }, []);
-  useEffect(() => () => islands.forEach((n) => { n.solid.dispose(); n.glow?.dispose(); }), [islands]);
+  useEffect(() => () => islands.forEach((n) => { n.solid.dispose(); n.archSolid.dispose(); n.glow?.dispose(); }), [islands]);
 
   return (
     <>
-      {islands.map((n, i) => (
-        <group key={i} position={[n.x, 0, n.z]} scale={n.scale}>
-          <mesh geometry={n.solid} material={VERTEX_MAT} raycast={noRay} />
-          {n.glow && <mesh geometry={n.glow} material={mat(PAL.window, WINDOW_OPTS)} raycast={noRay} />}
-        </group>
-      ))}
+      {islands.map((n, i) => {
+        const id = ARCH_ISLAND_ORDER[i];
+        const data = arch?.islands.find((island) => island.island === id);
+        const on = !!arch?.on;
+        return (
+          <group key={id} position={on ? archIslandPosition(id) : [n.x, 0, n.z]} scale={on ? ARCH_ISLAND_SCALE : n.scale}
+            onClick={on ? (event) => { event.stopPropagation(); arch?.onIslandClick(id); } : undefined}>
+            <mesh geometry={on ? n.archSolid : n.solid} material={on && !data?.route ? faded : VERTEX_MAT} raycast={on ? Mesh.prototype.raycast : noRay} />
+            {!on && n.glow && <mesh geometry={n.glow} material={mat(PAL.window, WINDOW_OPTS)} raycast={noRay} />}
+          </group>
+        );
+      })}
     </>
   );
 }

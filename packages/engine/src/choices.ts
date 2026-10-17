@@ -1,3 +1,5 @@
+import { isArchChoice, resolveArchChoice } from './archipelago/actions';
+import { generateArchChoice } from './archipelago/week';
 // Развилки и займы соседям: результат зависит от их настоящих наличных.
 import { clamp, freeSlotIndex, getDef } from './economy';
 import { nextUid } from './offers';
@@ -12,6 +14,7 @@ export function buyerAsset(player: PlayerState, uid: unknown) {
 export function generateChoice(world: WorldState, player: PlayerState, rng: Rng): void {
   if (player.isBot || player.choice || world.week < 3 || world.week - player.lastChoiceWeek < R.CHOICE_COOLDOWN) return;
   if (!rng.chance(R.CHOICE_CHANCE)) return;
+  if (generateArchChoice(world, player, rng)) return;
   const bots = world.players.filter((p) => p.isBot);
   const askers = bots.filter((p) => !player.lent.some((l) => l.neighborId === p.id)
     && (player.noAskUntil[p.id] ?? 0) < 1000000 && (player.noAskUntil[p.id] ?? 0) <= world.week);
@@ -45,9 +48,10 @@ export function generateChoice(world: WorldState, player: PlayerState, rng: Rng)
   player.lastChoiceWeek = world.week;
 }
 
-export function resolvePendingChoice(world: WorldState, player: PlayerState, accept: boolean): EngineError | null {
+export function resolvePendingChoice(world: WorldState, player: PlayerState, accept: boolean, loan = 0): EngineError | null {
   const choice = player.choice;
   if (!choice) return { code: 'noChoice' };
+  if (isArchChoice(choice.kind)) return resolveArchChoice(world, player, accept, loan);
   if (!accept) {
     if (choice.kind === 'neighborLoan') {
       const neighborId = String(choice.params.neighborId);

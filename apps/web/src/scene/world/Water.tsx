@@ -6,7 +6,7 @@ import { PAL } from '../palette';
 import { useBus } from '../bus';
 import { WX, mixWx } from '../weather';
 
-export function Water({ segments = 230 }: { segments?: number }) {
+export function Water({ segments = 230, wide = false }: { segments?: number; wide?: boolean }) {
   const bus = useBus();
   const { geo, material, uniforms } = useMemo(() => {
     const geo = new PlaneGeometry(700, 700, segments, segments);
@@ -53,5 +53,5 @@ export function Water({ segments = 230 }: { segments?: number }) {
     mixWx(uniforms.uDeep.value, WX.deep, k);
   });
 
-  return <mesh geometry={geo} material={material} receiveShadow raycast={() => null} />;
+  return <mesh geometry={geo} material={material} scale={wide ? [3, 1, 3] : [1, 1, 1]} receiveShadow raycast={() => null} />;
 }

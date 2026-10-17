@@ -1,3 +1,6 @@
+import { archProjection, fishBonus, grossIncome, linesNet, managerFee, normalizeManagers } from './archipelago/model';
+import { finishArchWeek, settleArchWeek } from './archipelago/week';
+import { OWNER_DAY_JOY } from './archipelago/rules';
 // Подсчёт итогов недели (шаги 2–8 из endWeek). Работает на уже скопированном мире.
 import { addLoan, returnToJob } from './actions';
 import { generateChoice, resolvePendingChoice, settleLent } from './choices';
@@ -70,14 +73,40 @@ function settlePlayer(world: WorldState, player: PlayerState, rng: Rng): PlayerW
   if (player.insured && week === player.insuranceFrom) events.push({ id: 'insuranceStarted', tone: 'good', params: {} });
   const eventsCash = events.reduce((sum, e) => sum + (e.cashDelta ?? 0), 0);
 
-  const net = salary
+  const projection = archProjection(world, player);
+  const arch = world.archipelago && !player.isBot ? projection.lines : null;
+  if (arch) {
+    arch.bankInterest = world.archipelago!.loans.filter((l) => l.borrower === 'npc' && l.startWeek <= week && l.dueWeek >= week)
+      .reduce((n, l) => n + Math.round(l.principal * l.weeklyRate), 0);
+    arch.repairs = world.archipelago!.pendingRepairs ?? 0;
+    world.archipelago!.pendingRepairs = 0;
+    world.archipelago!.log.bankInterest += arch.bankInterest;
+    world.archipelago!.log.businessIncome += arch.businesses - arch.managers - arch.upkeep - arch.insurance;
+  }
+  const extraFish = fishBonus(world, player);
+  if (extraFish) {
+    const fish = player.owned.find((a) => !a.damaged && (a.defId === 'boat' || a.defId === 'smokehouse'));
+    const line = assetIncome.find((l) => l.assetUid === fish?.uid);
+    if (line) line.amount += extraFish;
+    else if (fish) assetIncome.push({ assetUid: fish.uid, amount: extraFish });
+  }
+  const archNet = arch ? linesNet(arch) : projection.income - projection.expenses;
+  if (world.archipelago && player.isBot) {
+    const shared = world.archipelago.businesses.filter((b) => b.stakes.some((s) => s.playerId === 'p1'));
+    world.archipelago.log.paidToNeighbors += projection.management + shared.reduce((n, b) => {
+      const gross = grossIncome(world, world.archipelago!, b);
+      const share = b.stakes.find((s) => s.playerId === player.id)?.share ?? 0;
+      return n + Math.round((gross - managerFee(gross, b.manager)) * share);
+    }, 0);
+  }
+  const net = archNet + salary
     + assetIncome.reduce((s, e) => s + e.amount, 0)
     - upkeep.reduce((s, e) => s + e.amount, 0)
     - living - interest - insurance + eventsCash;
-  player.cash += net;
+  player.cash += net + (arch?.repairs ?? 0);
 
   const before = player.happiness;
-  player.happiness = clamp(before + weeklyHappinessDelta(player), 0, 100);
+  player.happiness = clamp(before + weeklyHappinessDelta(player) + (arch ? OWNER_DAY_JOY * world.archipelago!.businesses.filter((b) => b.manager === 'owner').length : 0), 0, 100);
 
   return {
     playerId: player.id,
@@ -94,6 +123,7 @@ function settlePlayer(world: WorldState, player: PlayerState, rng: Rng): PlayerW
     events,
     lostAssetUids: [],
     freedomReached: false,
+    arch,
   };
 }
 
@@ -148,7 +178,7 @@ function progressDreams(world: WorldState, reports: Record<string, PlayerWeekRep
 /** Шаг 6: проверка свободы (по настоящему пассивному доходу, без афер). */
 function checkFreedom(world: WorldState, reports: Record<string, PlayerWeekReport>, news: NewsItem[]): void {
   for (const player of world.players) {
-    if (player.freedomWeek !== null || !isFree(player, world.market)) continue;
+    if (player.freedomWeek !== null || !isFree(player, world.market, world)) continue;
     player.freedomWeek = world.week;
     reports[player.id].freedomReached = true;
     reports[player.id].events.push(freedomEvent());
@@ -159,7 +189,7 @@ function checkFreedom(world: WorldState, reports: Record<string, PlayerWeekRepor
 /** Шаг 6б: уровни свободы. Первый уровень празднует freedomEvent, здесь — запас прочности (2 и выше). */
 function updateLevels(world: WorldState, reports: Record<string, PlayerWeekReport>): void {
   for (const player of world.players) {
-    const level = freedomLevel(realFreedomRatio(player, world.market));
+    const level = freedomLevel(realFreedomRatio(player, world.market, world));
     if (level <= player.bestLevel) continue;
     player.bestLevel = level;
     if (level >= 2) reports[player.id].events.push(freedomLevelEvent(level));
@@ -171,7 +201,7 @@ function checkThreat(world: WorldState, reports: Record<string, PlayerWeekReport
   for (const player of world.players) {
     if (player.employed) continue;
     const events = reports[player.id].events;
-    if (isFree(player, world.market)) {
+    if (isFree(player, world.market, world)) {
       if (player.threatWeeks > 0) {
         events.push(threatOverEvent());
         player.threatWeeks = 0;
@@ -200,9 +230,10 @@ export function settleWeek(world: WorldState, news: NewsItem[]): WorldState {
   const endedWeek = world.week;
   const snapshot = snapshotMarket(world.market);
   for (const player of world.players) {
-    if (player.choice && player.choice.week <= endedWeek) resolvePendingChoice(world, player, false);
+    if (player.choice && !['partner', 'bankLoan', 'bizBuyer'].includes(player.choice.kind) && (player.choice.expiresWeek ?? player.choice.week) <= endedWeek) resolvePendingChoice(world, player, false);
   }
 
+  normalizeManagers(world);
   const reports: Record<string, PlayerWeekReport> = {};
   for (const player of world.players) {
     reports[player.id] = settlePlayer(world, player, rng);
@@ -212,6 +243,7 @@ export function settleWeek(world: WorldState, news: NewsItem[]): WorldState {
   }
 
   const worldEvents = rollWorldEvent(world, rng, reports);
+  settleArchWeek(world, reports, worldEvents, rng);
   collapseScams(world, reports, news);
   settleLent(world, reports);
   coverNegativeCash(world, reports, news);
@@ -220,6 +252,7 @@ export function settleWeek(world: WorldState, news: NewsItem[]): WorldState {
   updateLevels(world, reports);
   checkThreat(world, reports);
   for (const player of world.players) settleGoals(world, player, reports[player.id]);
+  finishArchWeek(world, reports);
   for (const player of world.players) generateChoice(world, player, rng);
   for (const player of world.players) reports[player.id].cashAfter = player.cash;
 

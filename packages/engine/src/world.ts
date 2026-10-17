@@ -62,7 +62,7 @@ function newPlayer(id: string, name: string, islandName: string, profession: Pro
 
 export function createWorld(opts: { seed: number; playerName: string; islandName: string; profession?: ProfessionId }): WorldState {
   const world: WorldState = {
-    version: 8,
+    version: 9,
     seed: opts.seed,
     rng: opts.seed >>> 0,
     nextUid: 1,
@@ -76,6 +76,7 @@ export function createWorld(opts: { seed: number; playerName: string; islandName
     offers: [],
     upcoming: [],
     lastReport: null,
+    archipelago: null,
   };
   for (const player of world.players) {
     const loan = PROFESSIONS[player.profession].loan;

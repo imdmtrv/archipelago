@@ -21,7 +21,7 @@ function remember(value: 'later' | 'done') {
 export function FeedbackPrompt() {
   const { t } = useI18n();
   const week = useGame((s) => s.world?.week ?? 0);
-  const blocked = useGame((s) => s.busy || !!s.modal || s.choiceOpen);
+  const blocked = useGame((s) => s.busy || !!s.modal || s.choiceOpen || !!s.archNotice);
   const [state, setState] = useState(stored);
   const due = state === null ? week > FIRST_WEEK : state === 'later' && week > SECOND_WEEK;
   if (!feedbackUrl || !due || blocked) return null;
