@@ -50,11 +50,10 @@ const store = (page, fn, arg) => page.evaluate(async ({ fn, arg }) => {
 
 async function nextWeek(page) {
   await page.locator('.next-main').first().click();
-  for (let i = 0; i < 20; i++) {
-    const next = page.getByRole('button', { name: /Дальше|Продолжить|Понятно|Закрыть/ }).first();
-    if (await page.locator('.modal').count() === 0) break;
-    if (await page.locator('.arch-milestone').count()) break;
-    if (await next.count()) await next.click().catch(() => {}); else await page.keyboard.press('Escape');
+  for (let i = 0; i < 60; i++) {
+    const st = await store(page, (s) => ({ busy: s.getState().busy, modal: !!s.getState().modal }));
+    if (!st.busy && !st.modal) break;
+    if (!st.busy && st.modal) await page.locator('.modal').getByRole('button', { name: /Дальше|Продолжить|Понятно/ }).first().click().catch(() => {});
     await page.waitForTimeout(250);
   }
 }
@@ -93,6 +92,8 @@ async function flow(size, label, { webgl = true, shot = null } = {}) {
     // 2. На 150% — окно, режим, камера, подсказка.
     await setFreedom(page, 1.7, 30000);
     await nextWeek(page);
+    if (process.env.ARCH_DEBUG) console.log(label, await store(page, (s) => ({ week: s.getState().world.week, arch: !!s.getState().world.archipelago,
+      modal: !!s.getState().modal, notice: s.getState().archNotice, busy: s.getState().busy, h2: [...document.querySelectorAll('.modal h2')].map((h) => h.textContent) })));
     const intro = page.locator('.arch-milestone');
     await intro.waitFor({ timeout: 8000 }).catch(() => {});
     const introOk = await intro.getByText('Архипелаг открыт').count();
@@ -124,8 +125,12 @@ async function flow(size, label, { webgl = true, shot = null } = {}) {
     const hadLater = await later.count();
     if (hadLater) await later.click();
     const modalGone = (await page.getByRole('button', { name: /Подумаю/ }).count()) === 0;
-    const dot = await store(page, (s, H, E) => !!E.archipelagoView(s.getState().world, H)?.attention);
-    check(tag('6. «Подумаю» закрывает, значок остаётся'), hadLater > 0 && modalGone && dot, `кнопка ${hadLater}, окно закрыто ${modalGone}, значок ${dot}`);
+    await store(page, (s) => s.getState().setArchMode(false));
+    await nextWeek(page);
+    await store(page, (s) => s.getState().setArchMode(true));
+    const dot = await store(page, (s, H, E) => s.getState().world.players[0].choice?.kind === 'partner'
+      && !!E.archipelagoView(s.getState().world, H)?.attention && !s.getState().choiceOpen);
+    check(tag('6. «Подумаю» закрывает, через неделю предложение и значок на месте'), hadLater > 0 && modalGone && dot, `кнопка ${hadLater}, окно закрыто ${modalGone}, значок ${dot}`);
     await store(page, (s) => { const w = structuredClone(s.getState().world); w.players[0].choice = null; s.setState({ world: w, choiceOpen: false }); });
     // 5 и 4. Набор 3/3 (рыбная связка), четвёртое дело — лимит.
     for (const island of ['Кедровый', 'Пеликан']) {
@@ -149,7 +154,9 @@ async function flow(size, label, { webgl = true, shot = null } = {}) {
     // 9. Подлёт к острову и обратно.
     if (webgl) {
       const lbl = page.locator('.isl-arch-label').filter({ hasText: 'Пеликан' }).first();
-      await lbl.click({ force: true }).catch(() => store(page, (s) => s.getState().setArchFocus('pelican')));
+      // На телефоне метки под шторкой — к острову подлетают нажатием на его карточку.
+      if (size.width < 700) await card(page, 'Пеликан').locator('.arch-card-summary').click();
+      else await lbl.click();
       const flew = await waitCamera(page, 'pelican');
       await page.waitForTimeout(300);
       if (shot === 'island') await page.screenshot({ path: resolve(shots, `${label}-island.png`), scale: 'css' });
@@ -177,10 +184,14 @@ async function flow(size, label, { webgl = true, shot = null } = {}) {
   }
 }
 
-await flow({ width: 1366, height: 768 }, 'desktop', { shot: 'overview' });
-await flow({ width: 390, height: 844 }, 'phone390', { shot: 'card' });
-await flow({ width: 360, height: 640 }, 'phone360', { shot: 'island' });
-await flow({ width: 1366, height: 768 }, 'nowebgl', { webgl: false });
+const only = option('--only', '');
+const runs = [
+  [{ width: 1366, height: 768 }, 'desktop', { shot: 'overview' }],
+  [{ width: 390, height: 844 }, 'phone390', { shot: 'card' }],
+  [{ width: 360, height: 640 }, 'phone360', { shot: 'island' }],
+  [{ width: 1366, height: 768 }, 'nowebgl', { webgl: false, shot: 'nowebgl' }],
+];
+for (const [size, label, opts] of runs) if (!only || only === label) await flow(size, label, opts);
 console.log(results.join('\n'));
 console.log(`Снимки: ${shots}`);
 if (results.some((r) => r.startsWith('FAIL'))) process.exitCode = 1;
