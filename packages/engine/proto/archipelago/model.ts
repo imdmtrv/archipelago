@@ -160,6 +160,8 @@ export function applyArchAction(world: WorldState, arch: ArchState, action: Arch
       requireAction(humanBusinessCount(arch) < R.MAX_HUMAN_BUSINESSES, 'достигнут предел дел человека');
       fund(world, def.price, action.loan, def.price * R.BUSINESS_LOAN_SHARE);
       build(arch, action.business, world.week);
+      // Купил сам, пока сосед ждал ответа, — предложение войти в долю снимается.
+      if (arch.choice?.kind === 'partner' && arch.choice.business === action.business) arch.choice = null;
       break;
     }
     case 'setManager': {
@@ -348,8 +350,9 @@ export function settleArch(world: WorldState, arch: ArchState): void {
   // 5.4–5.5: кризис влияет и на займы, заканчивающиеся сейчас.
   if (report.worldEvents.some((e) => e.id === 'crisis')) for (const loan of arch.loans) loan.crisisSeen = true;
   settleLoans(world, arch, week, rng);
-  // 5.6: week развилки — неделя ответа, как в движке.
-  if (arch.choice && arch.choice.week <= week) resolveChoice(world, arch, false);
+  // 5.6: week развилки — неделя ответа, как в движке; предложение соседа ждёт PARTNER_WAIT_WEEKS недель.
+  const wait = arch.choice?.kind === 'partner' ? R.PARTNER_WAIT_WEEKS - 1 : 0;
+  if (arch.choice && arch.choice.week + wait <= week) resolveChoice(world, arch, false);
   // 5.7: открытие архипелага.
   if (arch.openWeek === null && realFreedomRatio(me, world.market) >= R.OPEN_RATIO) arch.openWeek = week;
   // 5.8а: материк строит до новых развилок, не забирая деньги и не сдвигая ГПСЧ.

@@ -65,12 +65,14 @@ export const NEIGHBOR_LOAN_TRIES = 3;
 
 // ───────────── Соседи строят сами ─────────────
 /** Бот берётся за дело своего острова не раньше чем через столько недель после открытия… */
-export const BOT_DELAY = 15;
+export const BOT_DELAY = 20;
 /** …и когда наличных у него ≥ цена + этот запас. Перед стройкой предлагает человеку войти в долю пополам. */
 export const BOT_BUFFER: Record<string, number> = { 'bot-mia': 3000, 'bot-boris': 2000 };
 /** Какое дело какой бот строит сам. Тимур не строит — денег нет. */
 export const BOT_BUILDS: Record<string, 'hotel' | 'cannery'> = { 'bot-mia': 'hotel', 'bot-boris': 'cannery' };
 export const PARTNER_SHARE = 0.5;
+/** Сосед ждёт ответа на предложение войти в долю столько недель (без давления: можно накопить на свою половину). */
+export const PARTNER_WAIT_WEEKS = 4;
 
 // ───────────── Покупатель с материка ─────────────
 export const BUYER_CHANCE = 0.02;             // в неделю на каждое дело, целиком принадлежащее человеку

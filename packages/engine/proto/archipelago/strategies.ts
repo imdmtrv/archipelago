@@ -65,7 +65,8 @@ function credit(name: StrategyName, target: Target, world?: WorldState): number 
   return name === 'Цепочка' || name === 'Курорт' || name === 'Рисковый' ? max : 0;
 }
 
-function decideChoice(name: StrategyName, world: WorldState, arch: ArchState): ArchAction {
+/** null — подождать с ответом (предложение соседа ещё в силе, а на свою половину пока не хватает). */
+function decideChoice(name: StrategyName, world: WorldState, arch: ArchState): ArchAction | null {
   const choice = arch.choice!;
   const me = getPlayer(world, 'p1');
   let accept = false;
@@ -80,6 +81,8 @@ function decideChoice(name: StrategyName, world: WorldState, arch: ArchState): A
       loan = name === 'Везде понемногу' ? 0 : half * R.BUSINESS_LOAN_SHARE;
       // spec: «всегда» — согласие, когда половину можно оплатить с общим запасом.
       accept = eligible && me.cash - buffer(me) + loan >= half;
+      // Хочет в долю, но денег пока нет — ждёт, пока предложение в силе (Наобум не ждёт).
+      if (!accept && eligible && name !== 'Наобум' && world.week < choice.week + R.PARTNER_WAIT_WEEKS - 1) return null;
     } else if (choice.kind === 'loanRequest') {
       const crisis = name !== 'Рисковый' && name !== 'Наобум' && choice.borrower === 'npc' && choice.cls !== 'reliable'
         && rumorViews(world, 'p1').some((r) => r.kind === 'crisis' && r.source === 'reliable');
@@ -145,7 +148,8 @@ export function createStrategy(name: StrategyName, arch: ArchState): ArchStrateg
     if (!['Домосед', 'Рисковый', 'Наобум'].includes(name) && owned.length && state.insuredFrom === null) {
       return { type: 'setInsurance', on: true };
     }
-    if (state.choice) return decideChoice(name, world, state);
+    const answer = state.choice ? decideChoice(name, world, state) : null;
+    if (answer) return answer;
     for (const b of owned) if (b.damaged && (name === 'Рисковый' || name === 'Наобум' ? me.cash >= 2 * repairPrice(b)
       : me.cash - buffer(me) >= repairPrice(b)) && b.stakes.every((s) => s.playerId === 'p1'
         || getPlayer(world, s.playerId).cash >= Math.round(BUSINESSES[b.id].price * R.BUSINESS_REPAIR_SHARE * s.share))) {
