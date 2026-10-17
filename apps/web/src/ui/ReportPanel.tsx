@@ -4,6 +4,7 @@ import { Meter, Pips } from './common';
 import { lowerFirst, percent } from './text';
 import { levelGenitive, levelTitle, useI18n, weeks, weeksAcc } from '../i18n';
 import { ShareButton } from './ShareButton';
+import { ArchReport } from './arch/ArchReport';
 
 /** До свободы шкала 0–100%; после — шкала запаса до последнего уровня, с отметками уровней. */
 export function FreedomBlock({ compact = false }: { compact?: boolean }) {
@@ -52,6 +53,7 @@ export function FreedomBlock({ compact = false }: { compact?: boolean }) {
           ? <>{t.ui.report.toLevel(levelGenitive(level), percent(FREEDOM_LEVEL_RATIOS[level]))}</>
           : <>{t.ui.report.highest} <b>{lowerFirst(levelTitle(level))}</b></>}
       </div>
+      {!world.archipelago && !compact && <p className="arch-promise">{t.arch.promise(pct)}</p>}
       {!me.employed && me.threatWeeks > 0 && (
         <div className="warning freedom-warn">
           <span className="long">
@@ -107,17 +109,20 @@ export function Statement() {
           : <Row label={t.ui.report.noJob} value={0} muted />}
         {me.layoffWeeks > 0 && <div className="st-note neg">{t.ui.report.layoff(weeksAcc(me.layoffWeeks))}</div>}
         <Row label={`${t.ui.report.assets}${incomeCount ? ` (${incomeCount})` : ''}`} value={fin.passiveIncome} tone="pos" />
+        {world.archipelago && <div className="arch-finance-detail"><Row label={`${t.arch.report.included}: ${t.arch.report.title}`} value={fin.arch.income} tone="pos" /></div>}
       </div>
       <div className="st-group">
         <div className="st-title">{t.ui.report.expensesWeek}</div>
         <Row label={t.ui.report.living} value={fin.expenses.living} tone="neg" />
         {fin.expenses.upkeep > 0 && <Row label={t.ui.report.upkeep} value={fin.expenses.upkeep} tone="neg" />}
+        {world.archipelago && <div className="arch-finance-detail"><Row label={`${t.arch.report.included}: ${t.arch.report.title}`} value={fin.arch.expenses} tone="neg" /></div>}
         {fin.expenses.interest > 0 && <Row label={t.ui.report.interest} value={fin.expenses.interest} tone="neg" />}
         {fin.expenses.insurance > 0 && <Row label={t.ui.report.insurance} value={fin.expenses.insurance} tone="neg" />}
       </div>
       <Row label={t.ui.report.net} value={fin.net} tone={fin.net >= 0 ? 'pos' : 'neg'} strong />
       {fin.net < 0 && <div className="st-note neg">{t.ui.report.negative}</div>}
       {me.employed && !(me.layoffWeeks > 0) && me.happiness < 30 && <div className="st-note neg">{t.ui.report.burnout}</div>}
+      {world.lastReport?.players[HUMAN]?.arch && <section className="arch-actual"><div className="st-title">{t.ui.weekModal.kicker(world.lastReport.week)}</div><ArchReport lines={world.lastReport.players[HUMAN].arch} /></section>}
 
       <div className="capital">
         <div><span>{t.ui.cash}</span><b>{fmt(me.cash)}</b></div>

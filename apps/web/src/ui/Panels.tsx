@@ -8,6 +8,8 @@ import { ActionsTab } from './ActionsTab';
 import { DreamBlock } from './DreamBlock';
 import { GoalsBlock, MobileGoals } from './GoalsBlock';
 import { FreedomBlock, Statement } from './ReportPanel';
+import { ArchPanel } from './arch/ArchPanel';
+import { ArchToggle } from './arch/ArchControls';
 
 export function useMediaQuery(query: string) {
   const [match, setMatch] = useState(() => window.matchMedia(query).matches);
@@ -68,17 +70,19 @@ export function NextWeekButton({ compact }: { compact?: boolean }) {
 /** Компьютер: отчёт слева, вкладки справа (цели — своей вкладкой: в левой колонке им не хватает высоты), кнопка хода внизу по центру. */
 export function DesktopLayout() {
   const tab = useGame((s) => s.tab);
+  const archMode = useGame((s) => s.archMode);
   const current = tab === 'report' ? 'deals' : tab;
   return (
     <>
+      <ArchToggle />
       <aside className="col-left">
         <div className="panel pad"><FreedomBlock /></div>
         <DreamBlock panel />
         <div className="panel pad scroll"><Statement /></div>
       </aside>
       <aside className="col-right panel">
-        <Tabs tabs={['deals', 'island', 'actions', 'goals']} />
-        <div className="tab-scroll"><TabContent tab={current} /></div>
+        {!archMode && <Tabs tabs={['deals', 'island', 'actions', 'goals']} />}
+        <div className="tab-scroll">{archMode ? <ArchPanel /> : <TabContent tab={current} />}</div>
       </aside>
       <div className="col-center"><NextWeekButton /></div>
     </>
@@ -89,6 +93,7 @@ export function DesktopLayout() {
 export function MobileLayout() {
   const { t } = useI18n();
   const tab = useGame((s) => s.tab);
+  const archMode = useGame((s) => s.archMode);
   const open = useGame((s) => s.sheetOpen);
   const setOpen = useGame((s) => s.setSheetOpen);
   const free = useGame((s) => s.world!.players[0].freedomWeek !== null);
@@ -153,6 +158,7 @@ export function MobileLayout() {
   };
   return (
     <div ref={sheetRef} className={`sheet panel ${open ? 'open' : ''} ${dragHeight !== undefined ? 'dragging' : ''}`} style={{ height: dragHeight ?? (open ? undefined : closedHeight) }}>
+      <ArchToggle />
       <div ref={headerRef} className="sheet-header" onPointerDown={start} onPointerMove={move}
         // lostpointercapture всплывает от ручки, когда касание переходит к шапке, — это не отмена жеста.
         onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)} onLostPointerCapture={(event) => { if (event.target === event.currentTarget) finish(event, true); }}
@@ -163,9 +169,9 @@ export function MobileLayout() {
           <span />
         </button>
         <div ref={freedomRef} className="sheet-freedom" aria-hidden={open}><FreedomBlock compact /></div>
-        <Tabs tabs={['report', 'deals', 'island', 'actions']} />
+        {!archMode && <Tabs tabs={['report', 'deals', 'island', 'actions']} />}
       </div>
-      {open && <div className="tab-scroll">{tab === 'report' ? (
+      {open && <div className="tab-scroll">{archMode ? <ArchPanel /> : tab === 'report' ? (
         <div className="tab-body">
           <FreedomBlock />
           {free && <DreamBlock />}

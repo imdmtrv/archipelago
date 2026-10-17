@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { choiceView, type ChoiceView } from '@arch/engine';
 import { HUMAN, useGame } from '../store';
-import { assetCopy, coins, displayPlayer, errorText, useI18n, weeksAcc } from '../i18n';
+import { assetCopy, coins, displayPlayer, errorText, rumorWhen, useI18n, weeks, weeksAcc } from '../i18n';
 import { percent } from './text';
+import { playerName } from './arch/ArchPanel';
 
 /** Решение живёт в движке; закрытие окна оставляет его на следующую попытку хода. */
 export function ChoiceModal() {
@@ -10,11 +11,12 @@ export function ChoiceModal() {
   const world = useGame((s) => s.world);
   const open = useGame((s) => s.choiceOpen);
   const weekModal = useGame((s) => s.modal);
+  const archNotice = useGame((s) => s.archNotice);
   const close = useGame((s) => s.closeChoice);
   const act = useGame((s) => s.act);
   const showNeighbor = useGame((s) => s.showNeighbor);
   const ref = useRef<HTMLDivElement>(null);
-  const view = world && open && !weekModal ? choiceView(world, HUMAN) : null;
+  const view = world && open && !weekModal && !archNotice ? choiceView(world, HUMAN) : null;
   const uid = view?.uid;
 
   useEffect(() => {
@@ -34,12 +36,46 @@ export function ChoiceModal() {
   }, [uid, close]);
 
   if (!world || !view) return null;
-  // TODO(Codex 2): окна развилок архипелага — partner, bankLoan, bizBuyer (archipelago-screen.md, «Развилки»).
-  if (view.kind === 'partner' || view.kind === 'bankLoan' || view.kind === 'bizBuyer') return null;
   const copy = t.ui.choices;
   let title: string, text: string, hint: string, accept: string, decline: string, success: string;
-  let details;
-  if (view.kind === 'neighborLoan') {
+  let details: ReactNode;
+  let later: ReactNode;
+  if (view.kind === 'partner') {
+    const partner = t.arch.choices.partner;
+    const name = playerName(world, view.botId);
+    const business = t.arch.businesses[view.business];
+    title = partner.title(name);
+    text = partner.text(name, view.botId === 'bot-mia', business.accusative);
+    hint = partner.slot(view.slot.used + 1, view.slot.max);
+    accept = partner.accept(coins(view.half));
+    decline = partner.decline(view.botId === 'bot-mia');
+    success = accept;
+    details = <div className="choice-money"><span>{partner.half}</span><b>{coins(view.half)}</b></div>;
+    const remaining = view.expiresWeek - world.week;
+    if (remaining > 0) later = <button className="btn ghost" onClick={() => {
+      if (act({ type: 'deferChoice', playerId: HUMAN })) close();
+    }}>{partner.later(weeks(remaining))}</button>;
+  } else if (view.kind === 'bankLoan') {
+    const loan = t.arch.choices.bankLoan;
+    title = view.borrower === 'npc' ? loan.titleNpc(coins(view.amount)) : loan.titleNeighbor(playerName(world, view.borrower), coins(view.amount));
+    text = loan.terms(new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(view.weeklyRate * 100), weeksAcc(view.term), coins(view.weeklyInterest));
+    hint = loan.risk[view.cls];
+    accept = loan.accept(coins(view.amount));
+    decline = loan.decline;
+    success = accept;
+    details = <><div className={`arch-risk ${view.cls}`}>{loan.cls[view.cls]}</div>
+      {view.crisisRumor && <p className="warning">{loan.rumor(rumorWhen(view.crisisRumor, world.week))}</p>}</>;
+  } else if (view.kind === 'bizBuyer') {
+    const buyer = t.arch.choices.bizBuyer, business = t.arch.businesses[view.business];
+    title = buyer.title(business.accusative);
+    text = view.weeksOfIncome === null ? buyer.textNoIncome(coins(view.offer), business.title)
+      : buyer.text(coins(view.offer), business.title, coins(view.weeklyIncome), weeksAcc(view.weeksOfIncome));
+    hint = t.arch.card.limitHint;
+    accept = buyer.accept(coins(view.offer));
+    decline = buyer.decline;
+    success = accept;
+    details = <div className="freedom-line">{t.arch.card.freedom(percent(view.freedomBefore), percent(view.freedomAfter))}</div>;
+  } else if (view.kind === 'neighborLoan') {
     const neighbor = world.players.find((p) => p.id === view.neighborId);
     const name = neighbor ? displayPlayer(neighbor).name : view.neighborId;
     const loan = copy.neighborLoan;
@@ -80,8 +116,8 @@ export function ChoiceModal() {
     success = buyer.sold(asset.title, coins(view.offer));
     details = <><div className="choice-money">{buyer.income(coins(view.weeklyIncome))}</div><ChoiceFreedom view={view} /></>;
   }
-  const blocked = view.kind !== 'buyer' && !view.canAccept;
-  const reason = view.kind !== 'buyer' && view.reason ? errorText(view.reason) : undefined;
+  const blocked = 'canAccept' in view && !view.canAccept;
+  const reason = 'reason' in view && view.reason ? errorText(view.reason) : undefined;
   const resolve = (accepted: boolean) => {
     if (act({ type: 'resolveChoice', playerId: HUMAN, accept: accepted }, accepted ? success : copy.declined)) close();
   };
@@ -96,6 +132,7 @@ export function ChoiceModal() {
         <p className="hint-text">{hint}</p>
         <div className="choice-buttons">
           <button className="btn primary" disabled={blocked} onClick={() => resolve(true)}>{blocked && reason ? reason : accept}</button>
+          {later}
           <button className="btn ghost" onClick={() => resolve(false)}>{decline}</button>
         </div>
       </div>

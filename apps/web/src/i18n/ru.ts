@@ -560,6 +560,7 @@ export const ru = {
       },
       bizBuyer: {
         title: (accusative: string) => `Компания с материка хочет купить ${accusative}`,
+        textNoIncome: (offer: string, title: string) => `Предлагает ${offer}. Сейчас ${title.toLowerCase()} не приносит дохода. Место освободится.`,
         text: (offer: string, title: string, income: string, weeks: string) =>
           `Предлагает ${offer}. Сейчас ${title.toLowerCase()} приносит +${income}/нед — это ${weeks} дохода. Место освободится.`,
         accept: (coins: string) => `Продать за ${coins}`,
@@ -569,6 +570,7 @@ export const ru = {
     /** Строки отчёта недели и блока финансов. */
     report: {
       title: 'Архипелаг',
+      included: 'В том числе',
       businesses: 'Дела архипелага',
       managers: 'Управляющие',
       routes: 'Паромы',
